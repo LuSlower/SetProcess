@@ -23,7 +23,7 @@ uso: sp.exe <Argument> <ImageName> <Parameter>
 > [!important]
 > Use esta herramienta si realmente le es útil o sabe lo que hace
 >
-> Disfrutelo
+> disfrutelo
 
 ## DERECHOS DE AUTOR Y LICENCIA
 [LICENCIA](LICENSE)
