@@ -6,20 +6,21 @@ typedef struct {
     void (*action)(int argc, char* argv[]);
 } OptionAction;
 
-// Funciones para cada acci髇
+// Funciones para cada acci贸n
 void help_action(int argc, char* argv[]) {
     printf("uso: sp.exe <Argument> <ImageName> <Parameter>\n");
-    printf("\n  -c   <IM> <0,1,2...> <-r>           |    CpuSets");
-    printf("\n  -a   <IM> <0,1,2...> <-r>           |    Affinity");
+    printf("\n  -c   <IM> <core0,core2...> <-r>     |    CpuSets");
+    printf("\n  -idp <IM> <core> <-r>               |    Ideal Processor");
+    printf("\n  -a   <IM> <core0,core2...> <-r>     |    Affinity");
     printf("\n  -au  <IM> <0-1> <-r>                |    Affinity Update Mode");
     printf("\n  -p   <IM> <0-5> <-r>                |    CPU Priority");
     printf("\n  -pb  <IM> <-r>                      |    CPU Priority Boost");
     printf("\n  -mp  <IM> <1-5> <-r>                |    Memory Priority");
     printf("\n  -iop <IM> <0-3> <-r>                |    I/O Priority");
-    printf("\n  -eq  <IM>                           |    EcoQoS (Efficiency Mode)");
-    printf("\n  -hq  <IM>                           |    HighQoS (High Performance Mode)");
-    printf("\n  -s   <IM>                           |    Suspend");
-    printf("\n  -r   <IM>                           |    Resume\n");
+    printf("\n  -eq  <IM> <-r>                      |    EcoQoS (Efficiency Mode)");
+    printf("\n  -hq  <IM> <-r>                      |    HighQoS (High Performance Mode)");
+    printf("\n  -s   <IM> <-r>                      |    Suspend");
+    printf("\n  -r   <IM> <-r>                      |    Resume\n");
 }
 
 void cpu_set_action(int argc, char* argv[]) {
@@ -28,7 +29,7 @@ void cpu_set_action(int argc, char* argv[]) {
     // Obtener PID
     DWORD PID = GetPID(argv[2]);
 
-    // Habilitar privilegio para aumentar la prioridad de programaci髇
+    // Habilitar privilegio para aumentar la prioridad de programaci贸n
     EnablePrivilege(PID, SE_INC_BASE_PRIORITY_NAME);
 
     // parser
@@ -56,6 +57,31 @@ void cpu_set_action(int argc, char* argv[]) {
 
     return;
 
+}
+
+void ideal_processor_action(int argc, char* argv[]) {
+
+    // Obtener PID
+    DWORD PID = GetPID(argv[2]);
+
+    // Numero de procesadores ideales
+    DWORD dwIdealProcessor = ParseArg(argv[3]);
+
+    // Establecer procesador ideal
+    SetIdealProcessor(PID, dwIdealProcessor);
+        // Establecerlo en todos los procesos hijos
+    if (argc == 5 && strcmp(argv[4], "-r") == 0){
+        DWORD ChildPIDs[64] = {0}; // Inicializar el array a 0
+        DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+
+        for (DWORD i = 0; i < NumProcesses; i++) {
+            // Establecer procesador ideal
+            SetIdealProcessor(ChildPIDs[i], dwIdealProcessor);
+        }
+
+    }
+    printf("Sucess");
+    return;
 }
 
 void affinity_action(int argc, char* argv[]) {
@@ -234,7 +260,7 @@ void cpu_priority_boost_action(int argc, char* argv[]) {
 
     if (SetProcessPriorityBoost(hProcess, FALSE) != 0){
         // Establecerlo en todos los procesos hijos
-        if (argc == 5 && strcmp(argv[4], "-r") == 0){
+        if (argc == 4 && strcmp(argv[3], "-r") == 0){
             DWORD ChildPIDs[64] = {0};
             DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
 
@@ -250,7 +276,7 @@ void cpu_priority_boost_action(int argc, char* argv[]) {
     }
     else
     {
-        printf("Error al establecer el refuerzo din醡ico: %lu", GetLastError());
+        printf("Error al establecer el refuerzo din谩mico");
     }
     CloseHandle(hProcess);
     return;
@@ -345,6 +371,17 @@ void eco_qos_action(int argc, char* argv[]) {
     PowerThrottling.StateMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
 
     if (SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling)) != 0){
+            // Establecerlo en todos los procesos hijos
+            if (argc == 4 && strcmp(argv[3], "-r") == 0){
+                DWORD ChildPIDs[64] = {0};
+                DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+
+                for (DWORD i = 0; i < NumProcesses; i++) {
+                    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
+                    SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
+                    CloseHandle(hProcess);
+                }
+            }
         printf("Sucess");
     }
     else
@@ -373,6 +410,17 @@ void high_qos_action(int argc, char* argv[]) {
     PowerThrottling.StateMask = 0;
 
     if (SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling)) != 0){
+            // Establecerlo en todos los procesos hijos
+            if (argc == 4 && strcmp(argv[3], "-r") == 0){
+                DWORD ChildPIDs[64] = {0};
+                DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+
+                for (DWORD i = 0; i < NumProcesses; i++) {
+                    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
+                    SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
+                    CloseHandle(hProcess);
+                }
+            }
         printf("Sucess");
     }
     else
@@ -396,7 +444,18 @@ void suspend_action(int argc, char* argv[]) {
 
     // Suspender
     NtSuspendProcess(hProcess);
+        // Establecerlo en todos los procesos hijos
+        if (argc == 4 && strcmp(argv[3], "-r") == 0){
+            DWORD ChildPIDs[64] = {0};
+            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
 
+            for (DWORD i = 0; i < NumProcesses; i++) {
+                HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, ChildPIDs[i]);
+                EnablePrivilege(ChildPIDs[i], SE_DEBUG_NAME);
+                NtSuspendProcess(hProcess);
+                CloseHandle(hProcess);
+            }
+        }
     printf("Sucess");
 
     CloseHandle(hProcess);
@@ -415,7 +474,18 @@ void resume_action(int argc, char* argv[]) {
 
     // Reanudar
     NtResumeProcess(hProcess);
+        // Establecerlo en todos los procesos hijos
+        if (argc == 4 && strcmp(argv[3], "-r") == 0){
+            DWORD ChildPIDs[64] = {0};
+            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
 
+            for (DWORD i = 0; i < NumProcesses; i++) {
+                HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, ChildPIDs[i]);
+                EnablePrivilege(ChildPIDs[i], SE_DEBUG_NAME);
+                NtResumeProcess(hProcess);
+                CloseHandle(hProcess);
+            }
+        }
     printf("Sucess");
 
     CloseHandle(hProcess);
@@ -426,6 +496,7 @@ void resume_action(int argc, char* argv[]) {
 OptionAction option_actions[] = {
     {"help", help_action},
     {"-c", cpu_set_action},
+    {"-idp", ideal_processor_action},
     {"-a", affinity_action},
     {"-au", affinity_update_mode_action},
     {"-p", cpu_priority_action},
@@ -442,6 +513,11 @@ OptionAction option_actions[] = {
 //buscar parametro que coincida
 int main(int argc, char* argv[]) {
 
+    if (argc < 2) {
+        help_action(argc, argv);
+        return 0;
+    }
+
     // obtener privilegio de depuracion para evitar el descriptor de seguridad de otros procesos
     EnablePrivilege(GetCurrentProcessId(), SE_DEBUG_NAME, GetCurrentProcess());
 
@@ -454,7 +530,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
     }
-        // Si la opci髇 no coincide con ninguna acci髇 conocida, mostrar ayuda
+    // Si la opci贸n no coincide con ninguna acci贸n conocida, mostrar ayuda
     help_action(argc, argv);
     return 0;
 }
