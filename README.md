@@ -4,7 +4,7 @@
 pequeña CLI para control avanzado de procesos
 
 ```
-uso: sp.exe <Argument> <ImageName> <Parameter>
+use: sp.exe <Argument> <ImageName> <Parameter>
 
   -c   <IM> <core0,core2...> <-r>     |    CpuSets
   -idp <IM> <core> <-r>               |    Ideal Processor
