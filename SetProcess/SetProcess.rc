@@ -9,11 +9,9 @@ BEGIN
             VALUE "CompanyName", "LuSlower Software"
             VALUE "FileDescription", "SetProcess"
             VALUE "FileVersion", "0.0.0.0"
-            VALUE "InternalName", "SetProcess"
             VALUE "LegalCopyright", "Copyright © LuSlower"
-            VALUE "OriginalFilename", "sp.exe"
-            VALUE "ProductName", "SetProcess"
             VALUE "ProductVersion", "0.0.0.0"
+            VALUE "ProductName", "SetProcess"
         }
     }
     BLOCK "VarFileInfo"

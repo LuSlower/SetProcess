@@ -1,4 +1,4 @@
-#include "HelpProcess.h"
+#include "SetProcess.h"
 
 // Definir una estructura para asociar opciones con funciones
 typedef struct {
@@ -6,9 +6,9 @@ typedef struct {
     void (*action)(int argc, char* argv[]);
 } OptionAction;
 
-// Funciones para cada acci贸n
+// Funciones para cada acci髇
 void help_action(int argc, char* argv[]) {
-    printf("uso: sp.exe <Argument> <ImageName> <Parameter>\n");
+    printf("use: sp.exe <Argument> <ImageName> <Parameter>\n");
     printf("\n  -c   <IM> <core0,core2...> <-r>     |    CpuSets");
     printf("\n  -idp <IM> <core> <-r>               |    Ideal Processor");
     printf("\n  -a   <IM> <core0,core2...> <-r>     |    Affinity");
@@ -29,7 +29,7 @@ void cpu_set_action(int argc, char* argv[]) {
     // Obtener PID
     DWORD PID = GetPID(argv[2]);
 
-    // Habilitar privilegio para aumentar la prioridad de programaci贸n
+    // Habilitar privilegio para aumentar la prioridad de programaci髇
     EnablePrivilege(PID, SE_INC_BASE_PRIORITY_NAME);
 
     // parser
@@ -52,7 +52,7 @@ void cpu_set_action(int argc, char* argv[]) {
     }
     else
     {
-        printf("Error al establecer los conjuntos de CPU: %lu", GetLastError());
+        printf("Error setting cpu sets: %lu", GetLastError());
     }
 
     return;
@@ -113,7 +113,7 @@ void affinity_action(int argc, char* argv[]) {
     }
     else
     {
-        printf("Error al establecer la afinidad: %lu", GetLastError());
+        printf("Error setting affinity: %lu.\n", GetLastError());
     }
 
     // Cerrar Handle
@@ -163,7 +163,7 @@ void affinity_update_mode_action(int argc, char* argv[]) {
     }
     else
     {
-        printf("Error al establecer el modo de actualizacion de afinidad: %lu", GetLastError());
+        printf("Error setting affinity update mode: %lu.\n", GetLastError());
     }
 
     // Cerrar Handle
@@ -216,7 +216,7 @@ void cpu_priority_action(int argc, char* argv[]) {
             break;
         default:
         {
-            printf("Prioridad maxima 5 (REALTIME_PRIORITY_CLASS)");
+            printf("Maximum priority: 5 (REALTIME_PRIORITY_CLASS).\n");
             return;
         }
         break;
@@ -225,6 +225,7 @@ void cpu_priority_action(int argc, char* argv[]) {
 
     // Establecer prioridad
     if (SetPriorityClass(hProcess, dwPriorityClass) != 0){
+
         // Establecerlo en todos los procesos hijos
         if (argc == 5 && strcmp(argv[4], "-r") == 0){
             DWORD ChildPIDs[64] = {0};
@@ -241,7 +242,7 @@ void cpu_priority_action(int argc, char* argv[]) {
     }
     else
     {
-        printf("Error al establecer la prioridad de cpu: %lu", GetLastError());
+        printf("Error setting cpu priority: %lu.\n", GetLastError());
     }
 
     // Cerrar Handle
@@ -276,7 +277,7 @@ void cpu_priority_boost_action(int argc, char* argv[]) {
     }
     else
     {
-        printf("Error al establecer el refuerzo din谩mico");
+        printf("Error setting dynamic boost.\n");
     }
     CloseHandle(hProcess);
     return;
@@ -313,7 +314,7 @@ void memory_priority_action(int argc, char* argv[]) {
     }
     else
     {
-        printf("Error al establecer la prioridad de memoria: %lu", GetLastError());
+        printf("Error setting memory priority: %lu.\n", GetLastError());
     }
 
     CloseHandle(hProcess);
@@ -386,7 +387,7 @@ void eco_qos_action(int argc, char* argv[]) {
     }
     else
     {
-        printf("Error al establecer el modo EcoQos: %lu", GetLastError());
+        printf("Error setting EcoQos mode: %lu.\n", GetLastError());
     }
 
     CloseHandle(hProcess);
@@ -425,7 +426,7 @@ void high_qos_action(int argc, char* argv[]) {
     }
     else
     {
-        printf("Error al establecer el modo HighQoS: %lu", GetLastError());
+        printf("Error setting HighQoS mode: %lu.\n", GetLastError());
     }
 
     CloseHandle(hProcess);
@@ -522,7 +523,7 @@ int main(int argc, char* argv[]) {
     EnablePrivilege(GetCurrentProcessId(), SE_DEBUG_NAME, GetCurrentProcess());
 
     // Hacerse pasar por el hilo del sistema
-    ImpersonateSecurity();
+    ImpersonateSystem();
 
     for (int i = 0; option_actions[i].option != NULL; i++) {
         if (strcmp(argv[1], option_actions[i].option) == 0) {
@@ -530,7 +531,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
     }
-    // Si la opci贸n no coincide con ninguna acci贸n conocida, mostrar ayuda
+    // Si la opci髇 no coincide con ninguna acci髇 conocida, mostrar ayuda
     help_action(argc, argv);
     return 0;
 }
