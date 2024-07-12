@@ -33,17 +33,18 @@ void cpu_set_action(int argc, char* argv[]) {
     EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
     EnablePrivilege(dwProcessId, SE_INC_BASE_PRIORITY_NAME);
 
-    ULONG cpuBitMask = ConvertToBitMaskHex(argv[3]);
+    DWORD IdCount;
+    ULONG* Ids = ConvertToCpuSetIds(argv[3], &IdCount);
 
     // Establecer Conjuntos de CPU
-    if (SetProcessCpuSetMask(dwProcessId, cpuBitMask)){
+    if (SetProcessCpuSetID(dwProcessId, Ids, IdCount)){
         // Establecerlo en todos los procesos hijos
         if (argc == 5 && strcmp(argv[4], "-r") == 0){
             DWORD dwChildProcessId[64] = {0}; // Inicializar el array a 0
             DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
             for (DWORD i = 0; i < NumProcesses; i++) {
-                SetProcessCpuSetMask(dwChildProcessId[i], cpuBitMask);
+                SetProcessCpuSetID(dwChildProcessId[i], Ids, IdCount);
             }
 
         }

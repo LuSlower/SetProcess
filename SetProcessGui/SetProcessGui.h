@@ -134,17 +134,17 @@ extern "C" {
         ULONG IoPriority;
     } IO_PRIORITY_INFORMATION, *PIO_PRIORITY_INFORMATION;
 
-    WINBASEAPI WINBOOL WINAPI SetProcessDefaultCpuSetMasks(
-      HANDLE          Process,
-      PGROUP_AFFINITY CpuSetMasks,
-      USHORT          CpuSetMaskCount
+    WINBASEAPI WINBOOL WINAPI GetProcessDefaultCpuSets (
+        HANDLE Process,
+        PULONG CpuSetIds,
+        ULONG CpuSetIdCount,
+        PULONG RequiredIdCount
     );
 
-    WINBASEAPI WINBOOL WINAPI GetProcessDefaultCpuSetMasks(
-      HANDLE          Process,
-      PGROUP_AFFINITY CpuSetMasks,
-      USHORT          CpuSetMaskCount,
-      PUSHORT         RequiredMaskCount
+    WINBASEAPI WINBOOL WINAPI SetProcessDefaultCpuSets (
+        HANDLE Process,
+        const ULONG *CpuSetIds,
+        ULONG CpuSetIdCount
     );
 
     typedef enum _PROCINFOCLAS {
@@ -455,58 +455,63 @@ void UpdateToolTipText(HWND hwndControl, LPSTR text)
     SendMessage(hwndToolTip, TTM_UPDATETIPTEXT, 0, (LPARAM)&toolInfo);
 }
 
-BOOL GetProcessCpuSetMask(DWORD dwProcessId, PGROUP_AFFINITY cpuSetMasks, USHORT CpuSetMaskCount, PUSHORT RequiredMaskCount)
+BOOL GetProcessCpuSetId(DWORD dwProcessId, ULONG* cpuSetIds, ULONG* cpuSetIdCount)
 {
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
     if (hProcess == NULL) {
+        MessageBox(0, "Error opening process for CPU set IDs query.", "Error", MB_OK | MB_ICONERROR);
         return FALSE;
     }
 
-    BOOL success = GetProcessDefaultCpuSetMasks(hProcess, cpuSetMasks, CpuSetMaskCount, RequiredMaskCount);
+    ULONG requiredIdCount = 0;
+
+    // Obtener los IDs de los conjuntos de CPU predeterminados del proceso
+    BOOL success = GetProcessDefaultCpuSets(hProcess, cpuSetIds, *cpuSetIdCount, &requiredIdCount);
+
+    CloseHandle(hProcess);
+
     if (!success)
     {
-        MessageBox(0, "Error getting CPU set masks", "Error", MB_OK | MB_ICONERROR);
-    }
-
-    CloseHandle(hProcess);
-    return success;
-}
-
-BOOL SetProcessCpuSetMask(DWORD dwProcessId, DWORD cpuBitmask) {
-    // Abrir el proceso con permisos para establecer información limitada
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
-    if (hProcess == NULL) {
+        MessageBox(0, "Error getting default CPU sets.", "Error", MB_OK | MB_ICONERROR);
         return FALSE;
     }
 
-    // Si se especifica un bitmask de 0, se debe revertir los CpuSets
-    if (cpuBitmask == 0) {
-        BOOL success = SetProcessDefaultCpuSetMasks(hProcess, NULL, 0);
-        if (!success) {
-            MessageBox(0, "Error setting cpu sets", "Error", MB_OK | MB_ICONERROR);
-        }
-        CloseHandle(hProcess);
-        return success;
+    // Verificar si no se encontraron conjuntos de CPU asignados
+    if (requiredIdCount == 0)
+    {
+        return FALSE;
     }
 
-    // Obtener el número máximo de CPUs disponibles en el sistema
-    SYSTEM_INFO sysinfo;
-    GetSystemInfo(&sysinfo);
-    DWORD MAX_CPUS = sysinfo.dwNumberOfProcessors;
+    *cpuSetIdCount = requiredIdCount; // Actualizar el contador de IDs recibidos
 
-    GROUP_AFFINITY cpuSetMasks[1];
-    cpuSetMasks[0].Mask = cpuBitmask;
-    cpuSetMasks[0].Group = 0;
-    int actualCpuSetMaskCount = 1;
+    return TRUE;
+}
 
-    // Llamar a la función SetProcessDefaultCpuSetMasks para establecer las máscaras de CPU
-    BOOL success = SetProcessDefaultCpuSetMasks(hProcess, cpuSetMasks, actualCpuSetMaskCount);
-    if (!success) {
-        MessageBox(0, "Error setting cpu sets", "Error", MB_OK | MB_ICONERROR);
+BOOL SetProcessCpuSetId(DWORD dwProcessId, ULONG* cpuSetIds, DWORD IdCount)
+{
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
+    if (hProcess == NULL) {
+        MessageBox(0, "Error opening process", "Error", MB_OK | MB_ICONERROR);
+        return FALSE;
     }
 
-    // Cerrar el handle del proceso
+    BOOL success;
+    if (cpuSetIds == NULL || IdCount == 0)
+    {
+        success = SetProcessDefaultCpuSets(hProcess, NULL, 0);
+    }
+    else
+    {
+        success = SetProcessDefaultCpuSets(hProcess, cpuSetIds, IdCount);
+    }
+
     CloseHandle(hProcess);
+
+    if (!success)
+    {
+        MessageBox(0, "Error setting CPU set IDs for the process.", "Error", MB_OK | MB_ICONERROR);
+    }
+
     return success;
 }
 
@@ -562,6 +567,45 @@ int GetSingleCoreIndex(DWORD* CPUs, DWORD MAX_CPUS)
     return activeIndex; // Retornar el índice del bit activo o -1 si no se encontró exactamente uno
 }
 
+BOOL GetIdealProcessor(DWORD dwProcessId, PPROCESSOR_NUMBER lpIdealProcessor)
+{
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (hSnapshot == INVALID_HANDLE_VALUE)
+    {
+        return FALSE;
+    }
+
+    THREADENTRY32 te32;
+    te32.dwSize = sizeof(THREADENTRY32);
+
+    BOOL found = FALSE;
+
+    if (Thread32First(hSnapshot, &te32))
+    {
+        do
+        {
+            if (te32.th32OwnerProcessID == dwProcessId)
+            {
+                HANDLE hThread = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, te32.th32ThreadID);
+                if (hThread != NULL)
+                {
+                    PROCESSOR_NUMBER idealProcessor;
+                    if (GetThreadIdealProcessorEx(hThread, &idealProcessor))
+                    {
+                        *lpIdealProcessor = idealProcessor;
+                        found = TRUE;
+                    }
+                    CloseHandle(hThread);
+                }
+            }
+        } while (!found && Thread32Next(hSnapshot, &te32));
+    }
+
+    CloseHandle(hSnapshot);
+
+    return found;
+}
+
 void SetIdealProcessor(DWORD dwProcessId, DWORD dwIdealProcessor)
 {
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
@@ -576,7 +620,7 @@ void SetIdealProcessor(DWORD dwProcessId, DWORD dwIdealProcessor)
             {
                 if (te32.th32OwnerProcessID == dwProcessId)
                 {
-                    HANDLE hThread = OpenThread(THREAD_SET_LIMITED_INFORMATION, FALSE, te32.th32ThreadID);
+                    HANDLE hThread = OpenThread(THREAD_SET_INFORMATION, FALSE, te32.th32ThreadID);
                     if (hThread != NULL)
                     {
                         SetThreadIdealProcessor(hThread, dwIdealProcessor);
@@ -1067,18 +1111,43 @@ void LoadConfigProcess(const char* ProcessName, DWORD dwProcessId)
     EnablePrivilege(dwProcessId, SE_INC_BASE_PRIORITY_NAME);
     EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
-    // Cargar CpuSets
     char* cpuSetMask = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "CpuSets");
 
     if (cpuSetMask != nullptr)
     {
-        DWORD newCpuBitmask = 0;
-        for (DWORD i = 0; i < strlen(cpuSetMask); ++i) {
+        SYSTEM_INFO sysinfo;
+        GetSystemInfo(&sysinfo);
+        DWORD MAX_CPUS = sysinfo.dwNumberOfProcessors;
+
+        DWORD cpuSetBitMask[MAX_CPUS] = {0};
+        size_t maskLength = strlen(cpuSetMask);
+
+        // Asegurar que la longitud de la máscara no exceda el número máximo de CPUs
+        if (maskLength > MAX_CPUS) {
+            maskLength = MAX_CPUS;
+        }
+
+        // Convertir la cadena de bits a una bitmask
+        for (size_t i = 0; i < maskLength; ++i) {
             if (cpuSetMask[i] == '1') {
-                newCpuBitmask |= (1 << i);
+                cpuSetBitMask[i] = 1;  // Establecer el bit correspondiente en la bitmask
+            } else {
+                cpuSetBitMask[i] = 0;  // Asegurar que el resto se inicialice a 0
             }
         }
-        SetProcessCpuSetMask(dwProcessId, newCpuBitmask);
+
+        ULONG cpuSetIds[MAX_CPUS] = {0};
+        ULONG idIndex = 0;
+
+        // Convertir la bitmask a IDs de conjuntos de CPU
+        for (ULONG i = 0; i < MAX_CPUS; ++i) {
+            if (cpuSetBitMask[i] == 1) {
+                cpuSetIds[idIndex++] = i + 256; // Ajustar el valor según tu implementación
+            }
+        }
+
+        // Establecer los conjuntos de CPU para el proceso
+        SetProcessCpuSetId(dwProcessId, cpuSetIds, idIndex);
     }
 
     // Cargar IdealProcessor

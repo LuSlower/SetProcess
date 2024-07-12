@@ -161,74 +161,67 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (index != LB_ERR)
                 {
-                    DWORD CPUs[MAX_CPUS] = { 0 };
+                    ULONG cpuSetIds[MAX_CPUS] = {0};
+                    ULONG cpuSetIdCount = MAX_CPUS;
 
-                    DWORD cpuBitmask = 0;
-                    GROUP_AFFINITY cpuSetMasks[MAX_CPUS];
-                    USHORT actualCpuSetMaskCount = 0;
+                    // Obtener los IDs de los conjuntos de CPU para el proceso actual
+                    if(!GetProcessCpuSetId(dwProcessId, cpuSetIds, &cpuSetIdCount)){
+                        memset(cpuSetIds, 0, sizeof(cpuSetIds));
+                        cpuSetIdCount = 0;
+                    }
 
-                    // Obtener las máscaras de conjuntos de CPU predeterminadas
-                    BOOL success = GetProcessCpuSetMask(dwProcessId, cpuSetMasks, MAX_CPUS, &actualCpuSetMaskCount);
-
-                    if (success)
+                    DWORD cpuSetBitMask[MAX_CPUS] = {0}; // Crear la bitmask como un array
+                    for (ULONG i = 0; i < cpuSetIdCount; ++i)
                     {
-                        // Preparar la bitmask para mostrar en el diálogo o cualquier otro uso
-                        cpuBitmask = 0;
-                        for (USHORT i = 0; i < actualCpuSetMaskCount; ++i)
-                        {
-                            cpuBitmask |= cpuSetMasks[i].Mask;
-                        }
-
-                        // Actualizar CPUs[] según la bitmask obtenida
-                        for (DWORD i = 0; i < MAX_CPUS; ++i)
-                        {
-                            CPUs[i] = (cpuBitmask & (1ULL << i)) ? 1 : 0;
+                        // Convertir cada ID de CPU en la bitmask correspondiente
+                        if (cpuSetIds[i] >= 256) {
+                            cpuSetBitMask[cpuSetIds[i] - 256] = 1;
                         }
                     }
 
-                    // Mostrar el diálogo de bitmask con CPUs obtenidos o por defecto
-                    ShowBitMaskDialog(hwndDlg, CPUs);
+                    // Mostrar el diálogo para seleccionar conjuntos de CPU
+                    ShowBitMaskDialog(hwndDlg, cpuSetBitMask);
 
-                    bool OneProcessorSelected = false;
-                    // Verificar si al menos un procesador está seleccionado
-                    for (DWORD i = 0; i < MAX_CPUS; ++i)
+                    bool anyProcessorSelected = false;
+                    for (ULONG i = 0; i < MAX_CPUS; ++i)
                     {
-                        if (CPUs[i] == 1)
+                        if (cpuSetBitMask[i] != 0)
                         {
-                            OneProcessorSelected = true;
+                            anyProcessorSelected = true;
                             break;
                         }
                     }
 
-                    if (!OneProcessorSelected)
+                    if (!anyProcessorSelected)
                     {
-                        // Revertir
-                        SetProcessCpuSetMask(dwProcessId, NULL);
+                        // Si no se seleccionó ningún procesador, revertir los cambios
+                        SetProcessCpuSetId(dwProcessId, NULL, 0);
                         RegKeyDelete(HKEY_CURRENT_USER, registryKey, "CpuSets");
                         break;
                     }
 
-                    DWORD newCpuBitmask = 0;
-                    for (DWORD i = 0; i < MAX_CPUS; ++i)
+                    memset(cpuSetIds, 0, sizeof(cpuSetIds));
+                    ULONG idIndex = 0;
+
+                    for (ULONG i = 0; i < MAX_CPUS; ++i)
                     {
-                        if (CPUs[i] == 1)
+                        // Verificar si el bit en la posición i está activo en cpuSetBitMask
+                        if (cpuSetBitMask[i] == 1)
                         {
-                            newCpuBitmask |= (1 << i);
+                            cpuSetIds[idIndex++] = i + 256;
                         }
                     }
 
-                    // Establecer los conjuntos de CPU
-                    SetProcessCpuSetMask(dwProcessId, newCpuBitmask);
+                    // Establecer los conjuntos de CPU para el proceso
+                    SetProcessCpuSetId(dwProcessId, cpuSetIds, idIndex);
 
-                    // Convertir la nueva bitmask a una cadena de bits para almacenar en el registro
-                    char cpuBitmaskString[MAX_CPUS + 1] = { 0 }; // Más 1 para el terminador nulo
-                    for (DWORD i = 0; i < MAX_CPUS; ++i)
+                    char cpuSetIdsString[MAX_CPUS + 1] = { 0 }; // +1 para el terminador nulo
+                    for (ULONG i = 0; i < MAX_CPUS; ++i)
                     {
-                        cpuBitmaskString[i] = (newCpuBitmask & (1 << i)) ? '1' : '0';
+                        cpuSetIdsString[i] = (cpuSetBitMask[i] == 1) ? '1' : '0';
                     }
-
-                    // Escribir la nueva bitmask en el registro
-                    RegKeySet(HKEY_CURRENT_USER, registryKey, "CpuSets", cpuBitmaskString);
+                    cpuSetIdsString[MAX_CPUS] = '\0'; // Asegurar el terminador nulo
+                    RegKeySet(HKEY_CURRENT_USER, registryKey, "CpuSets", cpuSetIdsString);
                 }
             }
             return TRUE;
@@ -237,19 +230,17 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (index != LB_ERR)
                     {
-                        DWORD CPUs[MAX_CPUS] = { 0 };
+                        DWORD CPUs[MAX_CPUS] = {0};
 
-                        // Cargar IdealProcesor si existe
-                        char* IdealProcStr = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "IdealProc");
-                        if (IdealProcStr != nullptr)
+                        // Obtener el procesador ideal del hilo del proceso
+                        PROCESSOR_NUMBER idealProcessor;
+                        BOOL success = GetIdealProcessor(dwProcessId, &idealProcessor);
+
+                        DWORD idealProcessorIndex = idealProcessor.Number;
+
+                        for (DWORD i = 0; i < MAX_CPUS; ++i)
                         {
-                            DWORD IdealProc = atoi(IdealProcStr);
-                            memset(CPUs, 0, sizeof(DWORD) * MAX_CPUS);
-
-                            // Establecer el bit correspondiente en CPUs
-                            if (IdealProc < MAX_CPUS) {
-                                CPUs[IdealProc] = 1;
-                            }
+                            CPUs[i] = (i == idealProcessorIndex) ? 1 : 0;
                         }
 
                         ShowBitMaskDialog(hwndDlg, CPUs);
@@ -258,7 +249,6 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                             RegKeyDelete(HKEY_CURRENT_USER, registryKey, "IdealProc");
                             break;
                         }
-
 
                         // Establecer procesador ideal
                         SetIdealProcessor(dwProcessId, activeIndex);

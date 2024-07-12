@@ -22,10 +22,10 @@ extern "C" {
         ULONG IoPriority;
     } IO_PRIORITY_INFORMATION, *PIO_PRIORITY_INFORMATION;
 
-    WINBASEAPI WINBOOL WINAPI SetProcessDefaultCpuSetMasks(
-      HANDLE          Process,
-      PGROUP_AFFINITY CpuSetMasks,
-      USHORT          CpuSetMaskCount
+    WINBASEAPI WINBOOL WINAPI SetProcessDefaultCpuSets (
+        HANDLE Process,
+        const ULONG *CpuSetIds,
+        ULONG CpuSetIdCount
     );
 }
 
@@ -202,70 +202,76 @@ DWORD ConvertToBitMask(const char* Str, DWORD counts = NULL) {
     return Mask;
 }
 
-WORD ConvertToBitMaskHex(const char* Str) {
+ULONG* ConvertToCpuSetIds(const char* str, DWORD* Count) {
     SYSTEM_INFO sysinfo;
     GetSystemInfo(&sysinfo);
     DWORD MAX_CPUS = sysinfo.dwNumberOfProcessors;
 
-    DWORD Mask = 0;
-    const char* ptr = Str;
+    ULONG* cpus = (ULONG*)malloc(MAX_CPUS * sizeof(ULONG));
+    if (!cpus) {
+        MessageBox(0, "Error allocating memory for CPU sets", "Error", MB_OK | MB_ICONERROR);
+        return NULL;
+    }
+
+    DWORD numCpus = 0;
+    const char* ptr = str;
 
     while (*ptr != '\0') {
         char* endptr;
-        int Num = strtol(ptr, &endptr, 10);
+        int num = strtol(ptr, &endptr, 10);
         if (ptr == endptr) {
             break; // No se pudo convertir a número
         }
-        if (Num >= MAX_CPUS) {
-            MessageBox(0, "cpu number out of range", "Error", MB_OK | MB_ICONERROR);
-            return 0;
+        if (num >= MAX_CPUS) {
+            char errorMsg[64];
+            snprintf(errorMsg, sizeof(errorMsg), "Número de CPU fuera de rango: %d", num);
+            MessageBox(NULL, errorMsg, "Error", MB_OK | MB_ICONERROR);
+            free(cpus);
+            return NULL; // Salir si el número es mayor que el máximo de CPUs
         }
-        Mask |= (1 << Num);
+        // Ajustar num al ID de conjunto de CPU específico
+        cpus[numCpus++] = 256 + num; // Ejemplo: 256 es el primer ID de conjunto de CPU
+
         ptr = endptr;
+        // No saltar la coma, solo avanzar si es una coma
         if (*ptr == ',') {
-            ++ptr; // Saltar la coma
+            ptr++;
         }
     }
 
-    return Mask;
+    *Count = numCpus;
+    return cpus;
 }
 
-BOOL SetProcessCpuSetMask(DWORD dwProcessId, DWORD cpuBitmask) {
+BOOL SetProcessCpuSetID(DWORD dwProcessId, ULONG* Ids, DWORD Count) {
     // Abrir el proceso con permisos para establecer información limitada
     HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
     if (hProcess == NULL) {
+        MessageBox(0, "Error opening process", "Error", MB_OK | MB_ICONERROR);
         return FALSE;
     }
 
-    // Si se especifica un bitmask de 0, se debe revertir los CpuSets
-    if (cpuBitmask == 0) {
-        BOOL success = SetProcessDefaultCpuSetMasks(hProcess, NULL, 0);
-        if (!success) {
-            MessageBox(0, "Error setting cpu sets", "Error", MB_OK | MB_ICONERROR);
+    // Si se especifica NULL, se debe revertir los CpuSets
+    if (Ids == NULL) {
+        if (!SetProcessDefaultCpuSets(hProcess, NULL, 0)) {
+            MessageBox(0, "Error setting default CPU sets", "Error", MB_OK | MB_ICONERROR);
+            CloseHandle(hProcess);
+            return FALSE;
         }
         CloseHandle(hProcess);
-        return success;
+        return TRUE;
     }
 
-    // Obtener el número máximo de CPUs disponibles en el sistema
-    SYSTEM_INFO sysinfo;
-    GetSystemInfo(&sysinfo);
-    DWORD MAX_CPUS = sysinfo.dwNumberOfProcessors;
-
-    GROUP_AFFINITY cpuSetMasks[1];
-    cpuSetMasks[0].Mask = cpuBitmask;
-    cpuSetMasks[0].Group = 0;
-    int actualCpuSetMaskCount = 1;
-
-    // Llamar a la función SetProcessDefaultCpuSetMasks para establecer las máscaras de CPU
-    BOOL success = SetProcessDefaultCpuSetMasks(hProcess, cpuSetMasks, actualCpuSetMaskCount);
-    if (!success) {
-        MessageBox(0, "Error setting cpu sets", "Error", MB_OK | MB_ICONERROR);
+    // Llamar a la función SetProcessDefaultCpuSets para establecer las máscaras de CPU
+    if (!SetProcessDefaultCpuSets(hProcess, Ids, Count)) {
+        MessageBox(0, "Error setting CPU sets", "Error", MB_OK | MB_ICONERROR);
+        CloseHandle(hProcess);
+        return FALSE;
     }
 
     // Cerrar el handle del proceso
     CloseHandle(hProcess);
-    return success;
+    return TRUE;
 }
 
 void SetIdealProcessor(DWORD dwProcessId, DWORD dwIdealProcessor)
