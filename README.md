@@ -29,3 +29,5 @@ use: sp.exe <Argument> <ImageName or PID> <Argument>
 * Reset Config eliminará la entrada de registro del proceso (si hay otros procesos hijos con el mismo nombre se le aplicará la configuración), pronto emplearé la configuración a traves de command line
 
 * No aplique Cpu Sets, Ideal Processor o Affinity de manera contigua, trate de usar una de las configuraciones para cada proceso
+
+* Registra un WinEventHook que detecta los eventos `EVENT_SYSTEM_FOREGROUND | EVENT_OBJECT_CREATE` si los Ids de cada objeto no corresponden a una ventana o un objeto principal, entonces se retornará de la función, esto hace que el programa no requiera un intervalo de sondeo para verificar si un proceso se ha iniciado o no 
