@@ -8,162 +8,108 @@ typedef struct {
 
 // Funciones para cada acción
 void help_action(int argc, char* argv[]) {
-    printf("use: sp.exe <Argument> <ImageName> <Parameter>\n");
-    printf("\n  -c   <IM> <core0,core2...> <-r>     |    CpuSets");
-    printf("\n  -idp <IM> <core> <-r>               |    Ideal Processor");
-    printf("\n  -a   <IM> <core0,core2...> <-r>     |    Affinity");
-    printf("\n  -au  <IM> <0-1> <-r>                |    Affinity Update Mode");
-    printf("\n  -p   <IM> <0-5> <-r>                |    CPU Priority");
-    printf("\n  -pb  <IM> <-r>                      |    CPU Priority Boost");
-    printf("\n  -mp  <IM> <1-5> <-r>                |    Memory Priority");
-    printf("\n  -iop <IM> <0-3> <-r>                |    I/O Priority");
-    printf("\n  -eq  <IM> <-r>                      |    EcoQoS (Efficiency Mode)");
-    printf("\n  -hq  <IM> <-r>                      |    HighQoS (High Performance Mode)");
-    printf("\n  -s   <IM> <-r>                      |    Suspend");
-    printf("\n  -r   <IM> <-r>                      |    Resume\n");
+    printf("use: sp.exe <Argument> <ImageName or PID> <Argument>\n");
+    printf("\n  -c   <IM/PID> <Cores> <-r>              |    CpuSets");
+    printf("\n  -idp <IM/PID> <Core> <-r>               |    Ideal Processor");
+    printf("\n  -a   <IM/PID> <Cores> <-r>              |    Affinity");
+    printf("\n  -p   <IM/PID> <0-5> <-r>                |    CPU Priority");
+    printf("\n  -pb  <IM/PID> <-r>                      |    CPU Priority Boost");
+    printf("\n  -mp  <IM/PID> <1-5> <-r>                |    Memory Priority");
+    printf("\n  -iop <IM/PID> <0-3> <-r>                |    I/O Priority");
+    printf("\n  -eq  <IM/PID> <-r>                      |    EcoQoS (Efficiency Mode)");
+    printf("\n  -hq  <IM/PID> <-r>                      |    HighQoS (High Performance Mode)");
+    printf("\n  -s   <IM/PID> <-r>                      |    Suspend");
+    printf("\n  -r   <IM/PID> <-r>                      |    Resume\n");
 }
 
 void cpu_set_action(int argc, char* argv[]) {
 
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
+    EnablePrivilege(dwProcessId, SE_INC_BASE_PRIORITY_NAME);
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
-
-    // Habilitar privilegio para aumentar la prioridad de programación
-    EnablePrivilege(PID, SE_INC_BASE_PRIORITY_NAME);
-
-    // parser
-    ULONG CpuSetIdCount, Ids = ConvertToBitMask(argv[3], CpuSetIdCount);
-    ULONG* CpuSetIds = &Ids;
+    ULONG cpuBitMask = ConvertToBitMaskHex(argv[3]);
 
     // Establecer Conjuntos de CPU
-    if (SetProcessDefaultCpuSetsID(PID, CpuSetIds, CpuSetIdCount)){
+    if (SetProcessCpuSetMask(dwProcessId, cpuBitMask)){
         // Establecerlo en todos los procesos hijos
         if (argc == 5 && strcmp(argv[4], "-r") == 0){
-            DWORD ChildPIDs[64] = {0}; // Inicializar el array a 0
-            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+            DWORD dwChildProcessId[64] = {0}; // Inicializar el array a 0
+            DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
             for (DWORD i = 0; i < NumProcesses; i++) {
-                SetProcessDefaultCpuSetsID(ChildPIDs[i], CpuSetIds, CpuSetIdCount);
+                SetProcessCpuSetMask(dwChildProcessId[i], cpuBitMask);
             }
 
         }
-        printf("Sucess");
     }
-    else
-    {
-        printf("Error setting cpu sets: %lu", GetLastError());
-    }
-
     return;
 
 }
 
 void ideal_processor_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
     // Numero de procesadores ideales
-    DWORD dwIdealProcessor = ParseArg(argv[3]);
+    DWORD dwIdealProcessor = atoi(argv[3]);
 
     // Establecer procesador ideal
-    SetIdealProcessor(PID, dwIdealProcessor);
+    SetIdealProcessor(dwProcessId, dwIdealProcessor);
         // Establecerlo en todos los procesos hijos
     if (argc == 5 && strcmp(argv[4], "-r") == 0){
-        DWORD ChildPIDs[64] = {0}; // Inicializar el array a 0
-        DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+        DWORD dwChildProcessId[64] = {0}; // Inicializar el array a 0
+        DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
         for (DWORD i = 0; i < NumProcesses; i++) {
             // Establecer procesador ideal
-            SetIdealProcessor(ChildPIDs[i], dwIdealProcessor);
+            SetIdealProcessor(dwChildProcessId[i], dwIdealProcessor);
         }
 
     }
-    printf("Sucess");
     return;
 }
 
 void affinity_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
-    // parser
     DWORD dwProcessAffinityMask = ConvertToBitMask(argv[3]);
 
     // Obtener HANDLE
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, PID);
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
 
     // Establecer Afinidad
-    if (SetProcessAffinityMask(hProcess, dwProcessAffinityMask) != 0){
+    if (SetProcessAffinityMask(hProcess, dwProcessAffinityMask)){
         // Establecerlo en todos los procesos hijos
         if (argc == 5 && strcmp(argv[4], "-r") == 0){
-            DWORD ChildPIDs[64] = {0}; // Inicializar el array a 0
-            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+            DWORD dwChildProcessId[64] = {0}; // Inicializar el array a 0
+            DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
             for (DWORD i = 0; i < NumProcesses; i++) {
-                HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
+                HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwChildProcessId[i]);
                 SetProcessAffinityMask(hProcess, dwProcessAffinityMask);
                 CloseHandle(hProcess);
             }
 
         }
-        printf("Sucess");
-    }
-    else
-    {
-        printf("Error setting affinity: %lu.\n", GetLastError());
-    }
-
-    // Cerrar Handle
-    CloseHandle(hProcess);
-
-    return;
-}
-
-void affinity_update_mode_action(int argc, char* argv[]) {
-
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
-
-    DWORD dwFlags;
-    switch (atoi(argv[3])){
-        case 0:
-        {
-            dwFlags = 0;
-        }
-        break;
-        case 1:
-        {
-            dwFlags = PROCESS_AFFINITY_ENABLE_AUTO_UPDATE;
-        }
-        break;
-    }
-
-
-    // Obtener HANDLE
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, PID);
-
-    // Establecer Modo de Actualizacion de la Afinidad
-    if (SetProcessAffinityUpdateMode(hProcess, dwFlags) == 0){
-        // Establecerlo en todos los procesos hijos
-        if (argc == 5 && strcmp(argv[4], "-r") == 0){
-            DWORD ChildPIDs[64] = {0}; // Inicializar el array a 0
-            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
-
-            for (DWORD i = 0; i < NumProcesses; i++) {
-                HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
-                SetProcessAffinityUpdateMode(hProcess, dwFlags);
-                CloseHandle(hProcess);
-            }
-
-        }
-        printf("Sucess");
-    }
-    else
-    {
-        printf("Error setting affinity update mode: %lu.\n", GetLastError());
     }
 
     // Cerrar Handle
@@ -174,11 +120,16 @@ void affinity_update_mode_action(int argc, char* argv[]) {
 
 void cpu_priority_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
     // Obtener HANDLE
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, PID);
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
 
     // Convertir char a dword
     DWORD dwPriorityClass;
@@ -216,7 +167,7 @@ void cpu_priority_action(int argc, char* argv[]) {
             break;
         default:
         {
-            printf("Maximum priority: 5 (REALTIME_PRIORITY_CLASS).\n");
+            MessageBox(0, "Maximum priority: 5 (REALTIME_PRIORITY_CLASS)", "Error", MB_OK | MB_ICONINFORMATION);
             return;
         }
         break;
@@ -224,25 +175,20 @@ void cpu_priority_action(int argc, char* argv[]) {
     }
 
     // Establecer prioridad
-    if (SetPriorityClass(hProcess, dwPriorityClass) != 0){
+    if (SetPriorityClass(hProcess, dwPriorityClass)){
 
         // Establecerlo en todos los procesos hijos
         if (argc == 5 && strcmp(argv[4], "-r") == 0){
-            DWORD ChildPIDs[64] = {0};
-            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+            DWORD dwChildProcessId[64] = {0};
+            DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
             for (DWORD i = 0; i < NumProcesses; i++) {
-                HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
+                HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwChildProcessId[i]);
                 SetPriorityClass(hProcess, dwPriorityClass);
                 CloseHandle(hProcess);
             }
 
         }
-        printf("Sucess");
-    }
-    else
-    {
-        printf("Error setting cpu priority: %lu.\n", GetLastError());
     }
 
     // Cerrar Handle
@@ -253,31 +199,31 @@ void cpu_priority_action(int argc, char* argv[]) {
 
 void cpu_priority_boost_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
+    EnablePrivilege(dwProcessId, SE_INC_BASE_PRIORITY_NAME);
 
     // Obtener HANDLE
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, PID);
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
 
-    if (SetProcessPriorityBoost(hProcess, FALSE) != 0){
+    if (SetProcessPriorityBoost(hProcess, FALSE)){
         // Establecerlo en todos los procesos hijos
         if (argc == 4 && strcmp(argv[3], "-r") == 0){
-            DWORD ChildPIDs[64] = {0};
-            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+            DWORD dwChildProcessId[64] = {0};
+            DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
             for (DWORD i = 0; i < NumProcesses; i++) {
-                HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
+                HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwChildProcessId[i]);
                 SetProcessPriorityBoost(hProcess, FALSE);
                 CloseHandle(hProcess);
             }
 
         }
-        printf("Sucess");
-
-    }
-    else
-    {
-        printf("Error setting dynamic boost.\n");
     }
     CloseHandle(hProcess);
     return;
@@ -286,35 +232,35 @@ void cpu_priority_boost_action(int argc, char* argv[]) {
 
 void memory_priority_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
     // Obtener HANDLE
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, PID);
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
 
     // Establecer prioridad de memoria
     MEMORY_PRIORITY_INFORMATION MemPrio;
     SecureZeroMemory(&MemPrio, sizeof(MemPrio));
     MemPrio.MemoryPriority = atoi(argv[3]);
 
-    if (SetProcessInformation(hProcess, ProcessMemoryPriority, &MemPrio, sizeof(MemPrio)) != 0){
+    if (SetProcessInformation(hProcess, ProcessMemoryPriority, &MemPrio, sizeof(MemPrio))){
         // Establecerlo en todos los procesos hijos
         if (argc == 5 && strcmp(argv[4], "-r") == 0){
-            DWORD ChildPIDs[64] = {0};
-            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+            DWORD dwChildProcessId[64] = {0};
+            DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
             for (DWORD i = 0; i < NumProcesses; i++) {
-                HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
+                HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwChildProcessId[i]);
                 SetProcessInformation(hProcess, ProcessMemoryPriority, &MemPrio, sizeof(MemPrio));
                 CloseHandle(hProcess);
             }
 
         }
-        printf("Sucess");
-    }
-    else
-    {
-        printf("Error setting memory priority: %lu.\n", GetLastError());
     }
 
     CloseHandle(hProcess);
@@ -324,11 +270,16 @@ void memory_priority_action(int argc, char* argv[]) {
 
 void io_priority_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
     // Obtener HANDLE
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, PID);
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
 
     // Establecer prioridad E/S
     IO_PRIORITY_INFORMATION IoPrio;
@@ -338,17 +289,16 @@ void io_priority_action(int argc, char* argv[]) {
     NtSetInformationProcess(hProcess, ProcessIoPriority, &IoPrio, sizeof(IoPrio));
     // Establecerlo en todos los procesos hijos
     if (argc == 5 && strcmp(argv[4], "-r") == 0){
-        DWORD ChildPIDs[64] = {0};
-        DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+        DWORD dwChildProcessId[64] = {0};
+        DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
         for (DWORD i = 0; i < NumProcesses; i++) {
-            HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
+            HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwChildProcessId[i]);
             NtSetInformationProcess(hProcess, ProcessIoPriority, &IoPrio, sizeof(IoPrio));
             CloseHandle(hProcess);
         }
 
     }
-    printf("Sucess");
 
     CloseHandle(hProcess);
     return;
@@ -357,11 +307,16 @@ void io_priority_action(int argc, char* argv[]) {
 
 void eco_qos_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
     // Obtener HANDLE
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, PID);
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
 
     // Establecer estado de eficiencia (EcoQos)
     PROCESS_POWER_THROTTLING_STATE PowerThrottling;
@@ -371,23 +326,18 @@ void eco_qos_action(int argc, char* argv[]) {
     PowerThrottling.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
     PowerThrottling.StateMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
 
-    if (SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling)) != 0){
+    if (SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling))){
             // Establecerlo en todos los procesos hijos
             if (argc == 4 && strcmp(argv[3], "-r") == 0){
-                DWORD ChildPIDs[64] = {0};
-                DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+                DWORD dwChildProcessId[64] = {0};
+                DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
                 for (DWORD i = 0; i < NumProcesses; i++) {
-                    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
+                    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwChildProcessId[i]);
                     SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
                     CloseHandle(hProcess);
                 }
             }
-        printf("Sucess");
-    }
-    else
-    {
-        printf("Error setting EcoQos mode: %lu.\n", GetLastError());
     }
 
     CloseHandle(hProcess);
@@ -396,11 +346,16 @@ void eco_qos_action(int argc, char* argv[]) {
 
 void high_qos_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
     // Obtener HANDLE
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, PID);
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
 
     // Establecer estado de maximo rendimiento (HighQos)
     PROCESS_POWER_THROTTLING_STATE PowerThrottling;
@@ -410,23 +365,18 @@ void high_qos_action(int argc, char* argv[]) {
     PowerThrottling.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
     PowerThrottling.StateMask = 0;
 
-    if (SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling)) != 0){
+    if (SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling))){
             // Establecerlo en todos los procesos hijos
             if (argc == 4 && strcmp(argv[3], "-r") == 0){
-                DWORD ChildPIDs[64] = {0};
-                DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
+                DWORD dwChildProcessId[64] = {0};
+                DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
 
                 for (DWORD i = 0; i < NumProcesses; i++) {
-                    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, ChildPIDs[i]);
+                    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwChildProcessId[i]);
                     SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
                     CloseHandle(hProcess);
                 }
             }
-        printf("Sucess");
-    }
-    else
-    {
-        printf("Error setting HighQoS mode: %lu.\n", GetLastError());
     }
 
     CloseHandle(hProcess);
@@ -435,29 +385,34 @@ void high_qos_action(int argc, char* argv[]) {
 
 void suspend_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
-    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, PID);
+    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, dwProcessId);
 
     // Obtener privilegio de depuracion (por si falla)
-    EnablePrivilege(PID, SE_DEBUG_NAME);
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
     // Suspender
     NtSuspendProcess(hProcess);
-        // Establecerlo en todos los procesos hijos
-        if (argc == 4 && strcmp(argv[3], "-r") == 0){
-            DWORD ChildPIDs[64] = {0};
-            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
 
-            for (DWORD i = 0; i < NumProcesses; i++) {
-                HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, ChildPIDs[i]);
-                EnablePrivilege(ChildPIDs[i], SE_DEBUG_NAME);
-                NtSuspendProcess(hProcess);
-                CloseHandle(hProcess);
-            }
+    // Establecerlo en todos los procesos hijos
+    if (argc == 4 && strcmp(argv[3], "-r") == 0){
+        DWORD dwChildProcessId[64] = {0};
+        DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
+
+        for (DWORD i = 0; i < NumProcesses; i++) {
+            HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, dwChildProcessId[i]);
+            EnablePrivilege(dwChildProcessId[i], SE_DEBUG_NAME);
+            NtSuspendProcess(hProcess);
+            CloseHandle(hProcess);
         }
-    printf("Sucess");
+    }
 
     CloseHandle(hProcess);
     return;
@@ -465,29 +420,34 @@ void suspend_action(int argc, char* argv[]) {
 
 void resume_action(int argc, char* argv[]) {
 
-    // Obtener PID
-    DWORD PID = GetPID(argv[2]);
+    // Obtener PID, Obtener Privilegio
+    DWORD dwProcessId = GetPID(argv[2]);
+    if (dwProcessId == 0)
+    {
+        dwProcessId = atoi(argv[2]);
+    }
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
-    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, PID);
+    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, dwProcessId);
 
     // Obtener privilegio de depuracion (por si falla)
-    EnablePrivilege(PID, SE_DEBUG_NAME);
+    EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
     // Reanudar
     NtResumeProcess(hProcess);
-        // Establecerlo en todos los procesos hijos
-        if (argc == 4 && strcmp(argv[3], "-r") == 0){
-            DWORD ChildPIDs[64] = {0};
-            DWORD NumProcesses = GetChildProcesses(PID, ChildPIDs);
 
-            for (DWORD i = 0; i < NumProcesses; i++) {
-                HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, ChildPIDs[i]);
-                EnablePrivilege(ChildPIDs[i], SE_DEBUG_NAME);
-                NtResumeProcess(hProcess);
-                CloseHandle(hProcess);
-            }
+    // Establecerlo en todos los procesos hijos
+    if (argc == 4 && strcmp(argv[3], "-r") == 0){
+        DWORD dwChildProcessId[64] = {0};
+        DWORD NumProcesses = GetChildProcesses(dwProcessId, dwChildProcessId);
+
+        for (DWORD i = 0; i < NumProcesses; i++) {
+            HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, dwChildProcessId[i]);
+            EnablePrivilege(dwChildProcessId[i], SE_DEBUG_NAME);
+            NtResumeProcess(hProcess);
+            CloseHandle(hProcess);
         }
-    printf("Sucess");
+    }
 
     CloseHandle(hProcess);
     return;
@@ -499,7 +459,6 @@ OptionAction option_actions[] = {
     {"-c", cpu_set_action},
     {"-idp", ideal_processor_action},
     {"-a", affinity_action},
-    {"-au", affinity_update_mode_action},
     {"-p", cpu_priority_action},
     {"-pb", cpu_priority_boost_action},
     {"-mp", memory_priority_action},
@@ -520,7 +479,8 @@ int main(int argc, char* argv[]) {
     }
 
     // obtener privilegio de depuracion para evitar el descriptor de seguridad de otros procesos
-    EnablePrivilege(GetCurrentProcessId(), SE_DEBUG_NAME, GetCurrentProcess());
+    EnablePrivilege(GetCurrentProcessId(), SE_DEBUG_NAME);
+    EnablePrivilege(GetCurrentProcessId(), SE_INC_BASE_PRIORITY_NAME);
 
     // Hacerse pasar por el hilo del sistema
     ImpersonateSystem();

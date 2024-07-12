@@ -4,28 +4,17 @@
 #include <stdlib.h>
 #include <cstdlib>
 #include <tlhelp32.h>
+#include <winternl.h>
+#include <ntstatus.h>
 #include <processthreadsapi.h>
-
-#define PROCESS_AFFINITY_ENABLE_AUTO_UPDATE __MSABI_LONG(0x1U)
 
 extern "C" {
 
-    typedef enum _PROC_INF_CLASS {
-        ProcessIoPriority = 0x21
-    } PROC_INF_CLASS;
-
-    NTSYSAPI LONG NTAPI NtSetInformationProcess(
-        HANDLE ProcessHandle,
-        PROC_INF_CLASS ProcessInformationClass,
-        PVOID ProcessInformation,
-        ULONG ProcessInformationLength
-    );
-
-    NTSYSAPI LONG NTAPI NtSuspendProcess(
+    NTSYSAPI NTSTATUS NTAPI NtSuspendProcess(
         HANDLE ProcessHandle
     );
 
-    NTSYSAPI LONG NTAPI NtResumeProcess(
+    NTSYSAPI NTSTATUS NTAPI NtResumeProcess(
         HANDLE ProcessHandle
     );
 
@@ -33,29 +22,11 @@ extern "C" {
         ULONG IoPriority;
     } IO_PRIORITY_INFORMATION, *PIO_PRIORITY_INFORMATION;
 
-    typedef struct _CLIENT_ID {
-         PVOID UniqueProcess;
-         PVOID UniqueThread;
-    } CLIENT_ID, *PCLIENT_ID;
-
-    WINBASEAPI WINBOOL WINAPI SetProcessAffinityUpdateMode(
-        HANDLE hProcess,
-        DWORD dwFlags
+    WINBASEAPI WINBOOL WINAPI SetProcessDefaultCpuSetMasks(
+      HANDLE          Process,
+      PGROUP_AFFINITY CpuSetMasks,
+      USHORT          CpuSetMaskCount
     );
-
-    WINBASEAPI WINBOOL WINAPI SetProcessDefaultCpuSets(
-        HANDLE Process,
-        const ULONG* CpuSetIds,
-        ULONG CpuSetIdCount
-    );
-
-    WINBASEAPI WINBOOL WINAPI SetProcessInformation(
-        HANDLE hProcess,
-        PROCESS_INFORMATION_CLASS ProcessInformationClass,
-        LPVOID ProcessInformation,
-        DWORD ProcessInformationSize
-    );
-
 }
 
 bool EnablePrivilege(DWORD processId, LPCSTR privilegeName, HANDLE hProcess = NULL) {
@@ -64,7 +35,6 @@ bool EnablePrivilege(DWORD processId, LPCSTR privilegeName, HANDLE hProcess = NU
     tp.PrivilegeCount = 1;
     tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
     if (!LookupPrivilegeValue(NULL, privilegeName, &tp.Privileges[0].Luid)) {
-        printf("Error finding privilege value.\n");
         return false;
     }
 
@@ -72,7 +42,6 @@ bool EnablePrivilege(DWORD processId, LPCSTR privilegeName, HANDLE hProcess = NU
         hProcess = OpenProcess(PROCESS_ALL_ACCESS, TRUE, processId);
         // comprobar por ultima vez
         if (!hProcess){
-        printf("Error opening process token.\n");
         return false;
         }
     }
@@ -84,7 +53,6 @@ bool EnablePrivilege(DWORD processId, LPCSTR privilegeName, HANDLE hProcess = NU
     }
 
     if (!AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), NULL, NULL)) {
-        printf("Error adjusting token privileges.\n");
         CloseHandle(hToken);
         CloseHandle(hProcess);
         return false;
@@ -98,7 +66,6 @@ bool EnablePrivilege(DWORD processId, LPCSTR privilegeName, HANDLE hProcess = NU
 DWORD GetChildProcesses(DWORD ParentPID, DWORD* ChildPIDs) {
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hSnapshot == INVALID_HANDLE_VALUE) {
-        printf("Error creating a process snapshot.\n");
         return 0;
     }
 
@@ -113,7 +80,6 @@ DWORD GetChildProcesses(DWORD ParentPID, DWORD* ChildPIDs) {
                 if (NumProcesses < 64) {
                     ChildPIDs[NumProcesses++] = pe32.th32ProcessID;
                 } else {
-                    printf("The maximum limit of child processes has been reached.\n");
                     break;
                 }
             }
@@ -128,7 +94,6 @@ DWORD GetChildProcesses(DWORD ParentPID, DWORD* ChildPIDs) {
 DWORD GetPID(const char* processName) {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) {
-        printf("Error creating a process snapshot.\n");
         return 0;
     }
 
@@ -136,7 +101,6 @@ DWORD GetPID(const char* processName) {
     entry.dwSize = sizeof(PROCESSENTRY32);
     if (!Process32First(snapshot, &entry)) {
         CloseHandle(snapshot);
-        printf("Error getting first process entry.\n");
         return 0;
     }
 
@@ -159,7 +123,6 @@ BOOL ImpersonateSystem() {
     // Crear un snapshot de todos los hilos en el sistema
     HANDLE hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
     if (hThreadSnap == INVALID_HANDLE_VALUE) {
-        printf("Error creating snapshot of threads.\n");
         return FALSE;
     }
 
@@ -168,7 +131,6 @@ BOOL ImpersonateSystem() {
 
     // Recuperar información del primer hilo
     if (!Thread32First(hThreadSnap, &te32)) {
-        printf("Error retrieving information about the first thread.\n");
         CloseHandle(hThreadSnap);
         return FALSE;
     }
@@ -208,24 +170,6 @@ BOOL ImpersonateSystem() {
     return impersonated;
 }
 
-DWORD ParseArg(char* argumento) {
-    // Eliminar la coma del argumento
-    char* p = argumento;
-    char* q = argumento;
-    while (*q) {
-        if (*q != ',') {
-            *p++ = *q;
-        }
-        q++;
-    }
-    *p = '\0';
-
-    // Convertir la cadena resultante en un número entero
-    DWORD numero = atoi(argumento);
-
-    return numero;
-}
-
 DWORD CountSetBits(DWORD mask) {
     DWORD counts = 0;
     while (mask) {
@@ -258,18 +202,68 @@ DWORD ConvertToBitMask(const char* Str, DWORD counts = NULL) {
     return Mask;
 }
 
-BOOL SetProcessDefaultCpuSetsID(DWORD ProcessID, const ULONG* CpuSetIds, ULONG CpuSetIdCount) {
-    HANDLE hProcess = OpenProcess(PROCESS_SET_LIMITED_INFORMATION, FALSE, ProcessID);
+WORD ConvertToBitMaskHex(const char* Str) {
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    DWORD MAX_CPUS = sysinfo.dwNumberOfProcessors;
+
+    DWORD Mask = 0;
+    const char* ptr = Str;
+
+    while (*ptr != '\0') {
+        char* endptr;
+        int Num = strtol(ptr, &endptr, 10);
+        if (ptr == endptr) {
+            break; // No se pudo convertir a número
+        }
+        if (Num >= MAX_CPUS) {
+            MessageBox(0, "cpu number out of range", "Error", MB_OK | MB_ICONERROR);
+            return 0;
+        }
+        Mask |= (1 << Num);
+        ptr = endptr;
+        if (*ptr == ',') {
+            ++ptr; // Saltar la coma
+        }
+    }
+
+    return Mask;
+}
+
+BOOL SetProcessCpuSetMask(DWORD dwProcessId, DWORD cpuBitmask) {
+    // Abrir el proceso con permisos para establecer información limitada
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
     if (hProcess == NULL) {
-        printf("Error opening process");
         return FALSE;
     }
 
-    BOOL success = SetProcessDefaultCpuSets(hProcess, CpuSetIds, CpuSetIdCount);
-    if (!success) {
-        printf("Error setting cpu sets");
+    // Si se especifica un bitmask de 0, se debe revertir los CpuSets
+    if (cpuBitmask == 0) {
+        BOOL success = SetProcessDefaultCpuSetMasks(hProcess, NULL, 0);
+        if (!success) {
+            MessageBox(0, "Error setting cpu sets", "Error", MB_OK | MB_ICONERROR);
+        }
+        CloseHandle(hProcess);
+        return success;
     }
 
+    // Obtener el número máximo de CPUs disponibles en el sistema
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    DWORD MAX_CPUS = sysinfo.dwNumberOfProcessors;
+
+    GROUP_AFFINITY cpuSetMasks[1];
+    cpuSetMasks[0].Mask = cpuBitmask;
+    cpuSetMasks[0].Group = 0;
+    int actualCpuSetMaskCount = 1;
+
+    // Llamar a la función SetProcessDefaultCpuSetMasks para establecer las máscaras de CPU
+    BOOL success = SetProcessDefaultCpuSetMasks(hProcess, cpuSetMasks, actualCpuSetMaskCount);
+    if (!success) {
+        MessageBox(0, "Error setting cpu sets", "Error", MB_OK | MB_ICONERROR);
+    }
+
+    // Cerrar el handle del proceso
     CloseHandle(hProcess);
     return success;
 }

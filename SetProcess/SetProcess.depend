@@ -1,11 +1,11 @@
 # depslib dependency file v1.0
-1715017307 source:e:\documentos\codeblocks\setprocess\setprocess.cpp
+1715207805 source:e:\documentos\codeblocks\setprocess\setprocess.cpp
 	"HelpProcess.h"
 
 1714682076 source:e:\documentos\codeblocks\setprocess\setprocess.rc
 	<windows.h>
 
-1715100183 e:\documentos\codeblocks\setprocess\helpprocess.h
+1715192496 e:\documentos\codeblocks\setprocess\helpprocess.h
 	<windows.h>
 	<stdio.h>
 	<stdlib.h>

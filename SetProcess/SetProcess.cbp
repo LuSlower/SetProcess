@@ -21,8 +21,8 @@
 			<Add library="Kernel32" />
 			<Add library="ntdll" />
 		</Linker>
-		<Unit filename="HelpProcess.h" />
 		<Unit filename="SetProcess.cpp" />
+		<Unit filename="SetProcess.h" />
 		<Unit filename="SetProcess.rc">
 			<Option compilerVar="WINDRES" />
 		</Unit>
