@@ -534,7 +534,6 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (index != LB_ERR)
                     {
-
                         SetPriority("IO", dwProcessId, 3);
                         if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "IoPriority") != nullptr) {
                             RegKeySet(HKEY_CURRENT_USER, registryKey, "IoPriority", "3");
@@ -547,9 +546,8 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (index != LB_ERR)
                     {
-                        EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
-
                         SetProcessQos("ECO", dwProcessId);
+                        SetProcessPriority(dwProcessId, 0);
 
                         if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "HighQos") != nullptr) {
                             RegKeyDelete(HKEY_CURRENT_USER, registryKey, "HighQos");
@@ -563,9 +561,11 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (index != LB_ERR)
                     {
-                        EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
-
                         SetProcessQos("HIGH", dwProcessId);
+
+                        if (GetProcessPriority(dwProcessId) == 0) {
+                            SetProcessPriority(dwProcessId, 2);
+                        }
 
                         if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "EcoQos") != nullptr) {
                             RegKeyDelete(HKEY_CURRENT_USER, registryKey, "EcoQos");
