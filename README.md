@@ -20,7 +20,6 @@ use: sp.exe <Argument> <ImageName or PID> <Argument>
   -s   <IM/PID> <-r>                      |    Suspend
   -r   <IM/PID> <-r>                      |    Resume
 ```
-esta herramienta se basa en [código abierto](https://github.com/manciuszz/Thread-Pilot)
 ## GUI
 
 ![image](https://github.com/user-attachments/assets/9c9381f4-ea8b-4ac9-ba8d-c8cd478f920c)
@@ -37,6 +36,4 @@ esta herramienta se basa en [código abierto](https://github.com/manciuszz/Threa
 
 * Registra un WinEventHook que detecta los eventos `EVENT_SYSTEM_FOREGROUND | EVENT_OBJECT_CREATE` si los Ids de cada objeto no corresponden a una ventana o un objeto principal, entonces se retornará de la función, esto hace que el programa no requiera un intervalo de sondeo para verificar si un proceso se ha iniciado o no 
 
-esta herramienta se basa en [código abierto](https://github.com/manciuszz/Thread-Pilot)
-
-esta herramienta se basa en [código abierto](https://github.com/spddl/Hook)
+- Esta herramienta se basa en código abierto [1](https://github.com/manciuszz/Thread-Pilot)[2](https://github.com/spddl/Hook)
