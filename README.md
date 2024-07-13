@@ -20,6 +20,7 @@ use: sp.exe <Argument> <ImageName or PID> <Argument>
   -s   <IM/PID> <-r>                      |    Suspend
   -r   <IM/PID> <-r>                      |    Resume
 ```
+esta herramienta se basa en [Codigo Abierto](https://github.com/manciuszz/Thread-Pilot)
 ## GUI
 
 ![image](https://github.com/user-attachments/assets/9c9381f4-ea8b-4ac9-ba8d-c8cd478f920c)
