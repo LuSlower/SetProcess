@@ -24,6 +24,8 @@ use: sp.exe <Argument> <ImageName or PID> <Argument>
 
 ![image](https://github.com/user-attachments/assets/9c9381f4-ea8b-4ac9-ba8d-c8cd478f920c)
 
+* Presione ESC para ocultar la gui y dejar el trayicon
+
 * Las configuraciones se guardan en `HKCU\Software\SetProcess`
 
 * Reset Config eliminará la entrada de registro del proceso (si hay otros procesos hijos con el mismo nombre se le aplicará la configuración), pronto emplearé la configuración a traves de command line
