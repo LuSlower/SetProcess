@@ -458,7 +458,7 @@ void UpdateToolTipText(HWND hwndControl, LPSTR text)
 BOOL GetProcessCpuSetId(DWORD dwProcessId, ULONG* cpuSetIds, ULONG* cpuSetIdCount)
 {
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
-    if (hProcess == NULL) {
+    if (!hProcess) {
         MessageBox(0, "Error opening process for CPU set IDs query.", "Error", MB_OK | MB_ICONERROR);
         return FALSE;
     }
@@ -490,7 +490,7 @@ BOOL GetProcessCpuSetId(DWORD dwProcessId, ULONG* cpuSetIds, ULONG* cpuSetIdCoun
 BOOL SetProcessCpuSetId(DWORD dwProcessId, ULONG* cpuSetIds, DWORD IdCount)
 {
     HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
-    if (hProcess == NULL) {
+    if (!hProcess) {
         MessageBox(0, "Error opening process", "Error", MB_OK | MB_ICONERROR);
         return FALSE;
     }
@@ -498,34 +498,16 @@ BOOL SetProcessCpuSetId(DWORD dwProcessId, ULONG* cpuSetIds, DWORD IdCount)
     BOOL success;
     if (cpuSetIds == NULL || IdCount == 0)
     {
-        success = SetProcessDefaultCpuSets(hProcess, NULL, 0);
+        SetProcessDefaultCpuSets(hProcess, NULL, 0);
     }
     else
     {
-        success = SetProcessDefaultCpuSets(hProcess, cpuSetIds, IdCount);
+        SetProcessDefaultCpuSets(hProcess, cpuSetIds, IdCount);
     }
 
     CloseHandle(hProcess);
-
-    if (!success)
-    {
-        MessageBox(0, "Error setting CPU set IDs for the process.", "Error", MB_OK | MB_ICONERROR);
-    }
 
     return success;
-}
-
-void SetProcessAffinity(DWORD dwProcessId, DWORD_PTR dwProcessAffinityMask) {
-    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
-    if (hProcess == NULL) {
-        return;
-    }
-
-    // Aplicar la máscara de afinidad de procesador al proceso
-    if (!SetProcessAffinityMask(hProcess, dwProcessAffinityMask)) {
-        MessageBox(0, "Error setting processor affinity mask", "Error", MB_OK | MB_ICONERROR);
-    }
-    CloseHandle(hProcess);
 }
 
 DWORD_PTR GetProcessAffinity(DWORD dwProcessId) {
@@ -546,6 +528,17 @@ DWORD_PTR GetProcessAffinity(DWORD dwProcessId) {
 
     CloseHandle(hProcess);
     return dwProcessAffinityMask;
+}
+
+void SetProcessAffinity(DWORD dwProcessId, DWORD_PTR dwProcessAffinityMask) {
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
+    if (hProcess == NULL) {
+        return;
+    }
+
+    // Aplicar la máscara de afinidad de procesador al proceso
+    SetProcessAffinityMask(hProcess, dwProcessAffinityMask);
+    CloseHandle(hProcess);
 }
 
 int GetSingleCoreIndex(DWORD* CPUs, DWORD MAX_CPUS)
@@ -677,9 +670,7 @@ void SetProcessPriority(DWORD dwProcessId, DWORD dwPriorityClass)
     }
 
     // Establecer prioridad
-    if (SetPriorityClass(hProcess, dwPriorityClass) == 0){
-        MessageBox(0, "Error setting cpu priority", "Error", MB_OK | MB_ICONERROR);
-    }
+    SetPriorityClass(hProcess, dwPriorityClass);
 
 }
 
@@ -741,10 +732,7 @@ void SetPriority(const char* PriorityType, DWORD dwProcessId, ULONG Priority){
         MEMORY_PRIORITY_INFORMATION MemPrio;
         SecureZeroMemory(&MemPrio, sizeof(MemPrio));
         MemPrio.MemoryPriority = Priority;
-
-        if (!SetProcessInformation(hProcess, ProcessMemoryPriority, &MemPrio, sizeof(MemPrio))){
-            MessageBox(0, "Error setting memory priority", "Error", MB_OK | MB_ICONERROR);
-        }
+        SetProcessInformation(hProcess, ProcessMemoryPriority, &MemPrio, sizeof(MemPrio));
 
     } else if (strcmp(PriorityType, "IO") == 0) {
 
@@ -752,11 +740,7 @@ void SetPriority(const char* PriorityType, DWORD dwProcessId, ULONG Priority){
         IO_PRIORITY_INFORMATION IoPrio;
         SecureZeroMemory(&IoPrio, sizeof(IoPrio));
         IoPrio.IoPriority = Priority;
-
-        NTSTATUS status = NtSetInformationProcess(hProcess, ProcessIoPriority, &IoPrio, sizeof(IoPrio));
-        if (!NT_SUCCESS(status)){
-            MessageBox(0, "Error setting io priority", "Error", MB_OK | MB_ICONERROR);
-        }
+        NtSetInformationProcess(hProcess, ProcessIoPriority, &IoPrio, sizeof(IoPrio));
     }
 }
 
@@ -809,18 +793,11 @@ void SetProcessQos(const char* QosType, DWORD dwProcessId)
     if (strcmp(QosType, "ECO") == 0) {
         // Establecer estado de eficiencia (EcoQos)
         PowerThrottling.StateMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
-
-        if (!SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling))){
-            MessageBox(0, "Error setting eco qos", "Error", MB_OK | MB_ICONERROR);
-        }
-
+        SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
     } else if (strcmp(QosType, "HIGH") == 0) {
         // Establecer estado de maximo rendimiento (HighQos)
         PowerThrottling.StateMask = 0x0;
-
-        if (!SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling))){
-            MessageBox(0, "Error setting high qos", "Error", MB_OK | MB_ICONERROR);
-        }
+        SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
     }
 }
 
@@ -1194,6 +1171,7 @@ void LoadConfigProcess(const char* ProcessName, DWORD dwProcessId)
 
     // Cargar EcoQos
     if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "EcoQos") != nullptr) {
+        SetProcessPriority(dwProcessId, 0);
         SetProcessQos("ECO", dwProcessId);
     }
 
@@ -1319,6 +1297,14 @@ INT_PTR CALLBACK BitMaskDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
     {
         case WM_INITDIALOG:
         {
+
+            //establecer hIcon
+            HICON hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON));
+            SendMessage(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+
+            // Destruir icono
+            DestroyIcon(hIcon);
+
             // Asignar pCPUs desde lParam
             pCPUs = reinterpret_cast<DWORD*>(lParam);
 
@@ -1380,6 +1366,16 @@ INT_PTR CALLBACK BitMaskDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 
                     return (INT_PTR)TRUE;
                 }
+            }
+            break;
+        case WM_CLOSE:
+            {
+                // Desmarcar todos los checkboxes
+                for (DWORD i = 0; i < MAX_CPUS; ++i)
+                {
+                    CheckDlgButton(hDlg, IDC_CPU_0 + i, BST_UNCHECKED);
+                }
+                EndDialog(hDlg, 0);
             }
             break;
     }
