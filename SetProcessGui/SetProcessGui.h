@@ -1079,14 +1079,8 @@ void CheckMenuItemProcess(HMENU hMenu, char* ProcessName, DWORD dwProcessId){
 
     if (Qos == 0) {
         CheckMenuItem(hMenu, IDM_QOS_HIGHQOS, MF_BYCOMMAND | MF_CHECKED);
-        if (GetProcessPriority(dwProcessId) == 0) {
-            SetProcessPriority(dwProcessId, 2);
-        }
     } else if (Qos == PROCESS_POWER_THROTTLING_EXECUTION_SPEED) {
         CheckMenuItem(hMenu, IDM_QOS_ECOQOS, MF_BYCOMMAND | MF_CHECKED);
-        SetProcessPriority(dwProcessId, 0);
-
-
     }
 
     if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "EcoQos") != nullptr) {
