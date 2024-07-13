@@ -36,6 +36,6 @@ use: sp.exe <Argument> <ImageName or PID> <Argument>
 
 * Registra un WinEventHook que detecta los eventos `EVENT_SYSTEM_FOREGROUND | EVENT_OBJECT_CREATE` si los Ids de cada objeto no corresponden a una ventana o un objeto principal, entonces se retornará de la función, esto hace que el programa no requiera un intervalo de sondeo para verificar si un proceso se ha iniciado o no
 
-# Referencias
+# REFERENCIAS
 [1](https://github.com/manciuszz/Thread-Pilot)
 [2](https://github.com/spddl/Hook)
