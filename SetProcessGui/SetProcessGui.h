@@ -1146,8 +1146,12 @@ void LoadConfigProcess(const char* ProcessName, DWORD dwProcessId)
     // Cargar PriorityBoost
     char* priorityBoost = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost");
     if (priorityBoost != nullptr) {
-        HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
-        SetProcessPriorityBoost(hProcess, FALSE);
+        HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
+        if (strcmp(priorityBoost, "0") == 0) {
+            SetProcessPriorityBoost(hProcess, TRUE);
+        } else {
+            SetProcessPriorityBoost(hProcess, FALSE);
+        }
     }
 
     // Cargar PriorityClass

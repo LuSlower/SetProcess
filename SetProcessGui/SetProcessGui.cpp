@@ -266,7 +266,7 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (index != LB_ERR)
                     {
-                        DWORD CPUs[MAX_CPUS] = { 0 };
+                        DWORD CPUs[MAX_CPUS] = {0};
                         DWORD_PTR dwProcessAffinityMask = GetProcessAffinity(dwProcessId);
                         if (dwProcessAffinityMask != 0)
                         {
@@ -301,7 +301,6 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                         }
 
                         if (!OneProcessorSelected) {
-                            RegKeyDelete(HKEY_CURRENT_USER, registryKey, "AffinityMask");
                             break;
                         }
 
@@ -347,10 +346,16 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                         if (GetProcessPriorityBoost(hProcess, &pDisablePriorityBoost)) {
                             if (pDisablePriorityBoost == FALSE) {
                                 SetProcessPriorityBoost(hProcess, TRUE);
-                                break;
+                                if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost") != nullptr) {
+                                    RegKeySet(HKEY_CURRENT_USER, registryKey, "PriorityBoost", "0");
+                                }
+                            } else {
+                                SetProcessPriorityBoost(hProcess, FALSE);
+                                if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost") != nullptr) {
+                                    RegKeySet(HKEY_CURRENT_USER, registryKey, "PriorityBoost", "1");
+                                }
                             }
                         }
-                        SetProcessPriorityBoost(hProcess, FALSE);
                     }
 
                 }
@@ -591,6 +596,10 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case IDM_CPU_PRIORITY_BOOST_SAVE:
                 {
+                    if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost") != nullptr) {
+                        RegKeyDelete(HKEY_CURRENT_USER, registryKey, "PriorityBoost");
+                        break;
+                    }
 
                     HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
                     BOOL pDisablePriorityBoost;
