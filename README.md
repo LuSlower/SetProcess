@@ -22,7 +22,7 @@ use: sp.exe <Argument> <ImageName or PID> <Argument>
 ```
 ## GUI
 
-![image](https://github.com/user-attachments/assets/9c9381f4-ea8b-4ac9-ba8d-c8cd478f920c)
+![image](https://github.com/user-attachments/assets/8aa378cd-b2cf-4e85-8c2b-f64ad73f69bb)
 
 * Presione ESC para ocultar la gui y dejar el trayicon
 
