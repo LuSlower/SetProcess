@@ -116,6 +116,8 @@
 #define IDM_QOS_SAVE                 106
 #define IDC_CHECK_ALL                107
 #define IDC_UNCHECK                  108
+#define IDM_CRITICAL                 109
+#define IDM_KILL                     110
 HINSTANCE hInst;
 HWND hwndDlg;
 HWND hwndToolTip;
@@ -172,6 +174,7 @@ void _drain()
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA, false, GetCurrentProcessId());
     //drenar WorkingSet
     SetProcessWorkingSetSize(hProcess, (SIZE_T) -1, (SIZE_T) -1);
+    CloseHandle(hProcess);
 }
 
 //Leer REG_SZ del registro
@@ -627,6 +630,29 @@ void SetIdealProcessor(DWORD dwProcessId, DWORD dwIdealProcessor)
     }
 }
 
+BOOL IsBoost(DWORD dwProcessId){
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
+    BOOL pDisablePriorityBoost;
+    GetProcessPriorityBoost(hProcess, &pDisablePriorityBoost);
+    CloseHandle(hProcess);
+
+    if (pDisablePriorityBoost) {
+        return FALSE;
+    } else {
+        return TRUE;
+    }
+}
+
+void SetProcessBoost(DWORD dwProcessId, BOOL pBoost){
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
+    if (pBoost){
+        SetProcessPriorityBoost(hProcess, FALSE);
+    } else {
+        SetProcessPriorityBoost(hProcess, TRUE);
+    }
+    CloseHandle(hProcess);
+}
+
 void SetProcessPriority(DWORD dwProcessId, DWORD dwPriorityClass)
 {
 
@@ -671,6 +697,7 @@ void SetProcessPriority(DWORD dwProcessId, DWORD dwPriorityClass)
 
     // Establecer prioridad
     SetPriorityClass(hProcess, dwPriorityClass);
+    CloseHandle(hProcess);
 
 }
 
@@ -682,6 +709,7 @@ DWORD GetProcessPriority(DWORD dwProcessId)
     }
     DWORD dwPriorityClass;
     DWORD dwActualPriorityClass = GetPriorityClass(hProcess);
+    CloseHandle(hProcess);
 
     switch (dwActualPriorityClass)
     {
@@ -742,6 +770,7 @@ void SetPriority(const char* PriorityType, DWORD dwProcessId, ULONG Priority){
         IoPrio.IoPriority = Priority;
         NtSetInformationProcess(hProcess, ProcessIoPriority, &IoPrio, sizeof(IoPrio));
     }
+    CloseHandle(hProcess);
 }
 
 bool GetPriority(const char* PriorityType, DWORD dwProcessId, ULONG& Priority) {
@@ -799,6 +828,7 @@ void SetProcessQos(const char* QosType, DWORD dwProcessId)
         PowerThrottling.StateMask = 0x0;
         SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
     }
+    CloseHandle(hProcess);
 }
 
 void GetProcessQos(DWORD dwProcessId, ULONG& Qos) {
@@ -882,6 +912,30 @@ void _SR(const char* ActionType, DWORD dwProcessId) {
     } else if (strcmp(ActionType, "RESUME") == 0) {
         NtResumeProcess(hProcess);
     }
+}
+
+BOOL IsCritical(DWORD dwProcessId){
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
+    BOOL Critical;
+    IsProcessCritical(hProcess, &Critical);
+    CloseHandle(hProcess);
+    if (Critical){
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+
+void SetProcessCritical(DWORD dwProcessId, BOOL Critical){
+    HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
+    ULONG bBreakOnTermination;
+    if (Critical){
+         bBreakOnTermination = 1;
+    } else {
+        bBreakOnTermination = 0;
+    }
+    NtSetInformationProcess(hProcess, ProcessBreakOnTermination, &bBreakOnTermination, sizeof(bBreakOnTermination));
+    CloseHandle(hProcess);
 }
 
 DWORD GetProcInfo(DWORD dwProcessId, LPSTR lpPath, DWORD nSize)
@@ -1038,12 +1092,8 @@ void CheckMenuItemProcess(HMENU hMenu, char* ProcessName, DWORD dwProcessId){
     }
 
     // Verificar PriorityBoost
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
-    BOOL pDisablePriorityBoost;
-    if (GetProcessPriorityBoost(hProcess, &pDisablePriorityBoost)) {
-        if (pDisablePriorityBoost == FALSE) {
-            CheckMenuItem(hMenu, IDM_CPU_PRIORITY_BOOST, MF_BYCOMMAND | MF_CHECKED);
-        }
+    if (IsBoost(dwProcessId)) {
+        CheckMenuItem(hMenu, IDM_CPU_PRIORITY_BOOST, MF_BYCOMMAND | MF_CHECKED);
     }
 
     if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost") != nullptr) {
@@ -1072,6 +1122,9 @@ void CheckMenuItemProcess(HMENU hMenu, char* ProcessName, DWORD dwProcessId){
         ModifyMenu(hMenu, IDM_SUSPEND_RESUME, MF_BYCOMMAND | MF_STRING, IDM_SUSPEND_RESUME, "Suspend");
     }
 
+    if (IsCritical(dwProcessId)){
+        CheckMenuItem(hMenu, IDM_CRITICAL, MF_BYCOMMAND | MF_CHECKED);
+    }
 }
 
 void LoadConfigProcess(const char* ProcessName, DWORD dwProcessId)
@@ -1146,11 +1199,10 @@ void LoadConfigProcess(const char* ProcessName, DWORD dwProcessId)
     // Cargar PriorityBoost
     char* priorityBoost = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost");
     if (priorityBoost != nullptr) {
-        HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
         if (strcmp(priorityBoost, "0") == 0) {
-            SetProcessPriorityBoost(hProcess, TRUE);
+            SetProcessBoost(dwProcessId, TRUE);
         } else {
-            SetProcessPriorityBoost(hProcess, FALSE);
+            SetProcessBoost(dwProcessId, FALSE);
         }
     }
 

@@ -40,7 +40,6 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         char* start = RegKeyQuery(HKEY_CURRENT_USER, "Software\\SetProcess", "Start");
         if (start)
         {
-            Sleep(5000);
             CheckDlgButton(hwndDlg, _START, BST_CHECKED);
         }
 
@@ -341,19 +340,15 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (index != LB_ERR)
                     {
-                        HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
-                        BOOL pDisablePriorityBoost;
-                        if (GetProcessPriorityBoost(hProcess, &pDisablePriorityBoost)) {
-                            if (pDisablePriorityBoost == FALSE) {
-                                SetProcessPriorityBoost(hProcess, TRUE);
-                                if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost") != nullptr) {
-                                    RegKeySet(HKEY_CURRENT_USER, registryKey, "PriorityBoost", "0");
-                                }
-                            } else {
-                                SetProcessPriorityBoost(hProcess, FALSE);
-                                if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost") != nullptr) {
-                                    RegKeySet(HKEY_CURRENT_USER, registryKey, "PriorityBoost", "1");
-                                }
+                        if (IsBoost(dwProcessId)) {
+                            SetProcessBoost(dwProcessId, FALSE);
+                            if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost") != nullptr) {
+                                RegKeySet(HKEY_CURRENT_USER, registryKey, "PriorityBoost", "0");
+                            }
+                        } else {
+                            SetProcessBoost(dwProcessId, TRUE);
+                            if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost") != nullptr) {
+                                RegKeySet(HKEY_CURRENT_USER, registryKey, "PriorityBoost", "1");
                             }
                         }
                     }
@@ -679,9 +674,29 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 return TRUE;
 
-            case IDM_EXIT:
+            case IDM_CRITICAL:
                 {
-                    PostMessage(hwndDlg, WM_CLOSE, 0, 0);
+                    if (IsCritical(dwProcessId)){
+                        SetProcessCritical(dwProcessId, FALSE);
+                    } else {
+                        SetProcessCritical(dwProcessId, TRUE);
+                    }
+                }
+                return TRUE;
+
+            case IDM_KILL:
+                {
+                    if (IsCritical(dwProcessId)){
+                        MessageBox(0, "Stopping a critical process will result in a BSOD with code CRITICAL_PROCESS_DIED", "Error", MB_OK | MB_ICONERROR);
+                        break;
+                    }
+
+                    HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, dwProcessId);
+                    if(MessageBox(0, "Do you really want to kill the process?", "Warning", MB_OKCANCEL | MB_ICONWARNING) == 1){
+                        TerminateProcess(hProcess, 0);
+                        CloseHandle(hProcess);
+                        PopulateListBox(hListBox);
+                    }
                 }
                 return TRUE;
 
@@ -691,10 +706,16 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 return TRUE;
 
-            } //end Switch wParam
+            case IDM_EXIT:
+                {
+                    PostMessage(hwndDlg, WM_CLOSE, 0, 0);
+                }
+                return TRUE;
+
+            }
             return TRUE;
         }
-        return TRUE; //end WM_COMMAND
+        return TRUE;
 
         case WM_CLOSE:
         {
