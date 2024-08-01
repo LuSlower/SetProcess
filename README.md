@@ -1,7 +1,7 @@
 # SetProcess
 [![Total Downloads](https://img.shields.io/github/downloads/LuSlower/SetProcess/total.svg)](https://github.com/LuSlower/SetProcess/releases/latest) [![PayPal Badge](https://img.shields.io/badge/PayPal-003087?logo=paypal&logoColor=fff&style=flat)](https://paypal.me/eldontweaks) 
 
-Herramienta hecha para un control avanzado de procesos
+Tool made for advanced process control
 
 ## CLI
 
@@ -24,19 +24,19 @@ use: sp.exe <Argument> <ImageName or PID> <Argument>
 
 ![image](https://github.com/user-attachments/assets/8aa378cd-b2cf-4e85-8c2b-f64ad73f69bb)
 
-* Presione ESC para ocultar la gui y dejar el trayicon
+* Press ESC to hide the gui and leave the trayicon
 
-* Las configuraciones se guardan en `HKCU\Software\SetProcess`
+* Settings are saved in `HKCU\Software\SetProcess`
 
-* Reset Config eliminará la entrada de registro del proceso (si hay otros procesos hijos con el mismo nombre se le aplicará la configuración), pronto emplearé la configuración a traves de command line
+* Reset Config will remove the process registry entry (if there are other child processes with the same name the configuration will be applied to it), I will soon use the configuration via command line
 
-* No aplique Cpu Sets, Ideal Processor o Affinity de manera contigua, trate de usar una de las configuraciones para cada proceso
+* Do not apply Cpu Sets, Ideal Processor or Affinity back to back, try to use one of the settings for each process
 
-* Para revertir los cambios de CpuSets no marque ningun núcleo (tambien borrará la configuración del registro), si no marca ningún núcleo o más de dos en IdealProcessor no se aplicará la configuración (tambien borrará la configuración del registro), si no marca ningun nucleo en Affinity no se aplicará la configuración, si marca todos se borrara la configuración del registro
+* To revert the CpuSets changes, do not check any core (it will also delete the registry configuration), if you do not check any core or more than two in IdealProcessor the configuration will not be applied (it will also delete the registry configuration), if you do not check any core In Affinity the configuration will not be applied, if you check all the configuration will be deleted from the registry
 
-* Si quiere buscar de forma más rápida el proceso deseado, escriba en el ListBox no saldrá un cursor pero si escribe correctamente se seleccionará
+* If you want to search for the desired process more quickly, write in the ListBox, a cursor will not appear but if you write correctly it will be selected
 
-* Registra un WinEventHook que detecta los eventos `EVENT_SYSTEM_FOREGROUND | EVENT_OBJECT_CREATE` si los Ids de cada objeto no corresponden a una ventana o un objeto principal, entonces se retornará de la función, esto hace que el programa no requiera un intervalo de sondeo para verificar si un proceso se ha iniciado o no
+* Registers a WinEventHook that listens for events `EVENT_SYSTEM_FOREGROUND | EVENT_OBJECT_CREATE` if the Ids of each object do not correspond to a window or a main object, then it will be returned from the function, this makes the program not require a polling interval to check if a process has started or not
 
-# REFERENCIAS
+# REF
 [1](https://github.com/spddl/Hook)
