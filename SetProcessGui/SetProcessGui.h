@@ -399,7 +399,7 @@ DWORD ExtractPID(const char* str) {
 
 void ExtractProcessName(const char* str, char* processName, size_t bufferSize) {
     if (!str || !processName || bufferSize == 0) {
-        return; // Manejo básico de errores de parámetros nulos o tamaño de buffer cero
+        return;
     }
 
     const char* start = str; // El inicio del nombre del proceso
@@ -409,14 +409,14 @@ void ExtractProcessName(const char* str, char* processName, size_t bufferSize) {
         size_t length = end - start;
         if (length < bufferSize - 1) {
             strncpy(processName, start, length);
-            processName[length] = '\0'; // Asegurar que la cadena termina con '\0'
+            processName[length] = '\0';
         } else {
             strncpy(processName, start, bufferSize - 1);
-            processName[bufferSize - 1] = '\0'; // Asegurar que la cadena termina con '\0'
+            processName[bufferSize - 1] = '\0';
         }
     } else {
         // No se encontró el nombre del proceso en el formato esperado
-        processName[0] = '\0'; // Cadena vacía
+        processName[0] = '\0';
     }
 }
 
@@ -453,7 +453,7 @@ void UpdateToolTipText(HWND hwndControl, LPSTR text)
     toolInfo.hwnd = GetParent(hwndControl); // Obtener el HWND del control padre
     toolInfo.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
     toolInfo.uId = (UINT_PTR)hwndControl;
-    toolInfo.lpszText = text;  // Cambiado a text (LPSTR)
+    toolInfo.lpszText = text;
 
     SendMessage(hwndToolTip, TTM_UPDATETIPTEXT, 0, (LPARAM)&toolInfo);
 }
@@ -938,21 +938,85 @@ void SetProcessCritical(DWORD dwProcessId, BOOL Critical){
     CloseHandle(hProcess);
 }
 
-DWORD GetProcInfo(DWORD dwProcessId, LPSTR lpPath, DWORD nSize)
-{
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcessId);
+char* GetProcessCommandLine(DWORD dwProcessId) {
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, dwProcessId);
+    if (!hProcess) {
+        return NULL;
+    }
+
+    PROCESS_BASIC_INFORMATION pbi;
+    ULONG returnLength;
+    NTSTATUS status = NtQueryInformationProcess(hProcess, ProcessBasicInformation, &pbi, sizeof(pbi), &returnLength);
+    if (status != 0) {
+        CloseHandle(hProcess);
+        return NULL;
+    }
+
+    PEB peb;
+    if (!ReadProcessMemory(hProcess, pbi.PebBaseAddress, &peb, sizeof(peb), NULL)) {
+        CloseHandle(hProcess);
+        return NULL;
+    }
+
+    RTL_USER_PROCESS_PARAMETERS procParams;
+    if (!ReadProcessMemory(hProcess, peb.ProcessParameters, &procParams, sizeof(procParams), NULL)) {
+        CloseHandle(hProcess);
+        return NULL;
+    }
+
+    UNICODE_STRING commandLineUnicode = procParams.CommandLine;
+    WCHAR* commandLineBuffer = (WCHAR*)malloc(commandLineUnicode.Length + sizeof(WCHAR));
+    if (!commandLineBuffer) {
+        CloseHandle(hProcess);
+        return NULL;
+    }
+
+    if (!ReadProcessMemory(hProcess, commandLineUnicode.Buffer, commandLineBuffer, commandLineUnicode.Length, NULL)) {
+        free(commandLineBuffer);
+        CloseHandle(hProcess);
+        return NULL;
+    }
+
+    commandLineBuffer[commandLineUnicode.Length / sizeof(WCHAR)] = L'\0'; // Asegurarse de que está terminada en null
+
+    // Convertir UNICODE_STRING a char*
+    int bufferSize = WideCharToMultiByte(CP_UTF8, 0, commandLineBuffer, -1, NULL, 0, NULL, NULL);
+    char* commandLine = (char*)malloc(bufferSize);
+    if (!commandLine) {
+        free(commandLineBuffer);
+        CloseHandle(hProcess);
+        return NULL;
+    }
+    WideCharToMultiByte(CP_UTF8, 0, commandLineBuffer, -1, commandLine, bufferSize, NULL, NULL);
+
+    free(commandLineBuffer);
+    CloseHandle(hProcess);
+    return commandLine;
+}
+
+void GetProcInfo(DWORD dwProcessId, LPSTR lpPath, DWORD nSize) {
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, dwProcessId);
     if (hProcess == NULL) {
-        return 0;
+        return;
     }
 
     DWORD dwLength = nSize;
     if (!QueryFullProcessImageName(hProcess, 0, lpPath, &dwLength)) {
         CloseHandle(hProcess);
-        return 0;
+        return;
     }
 
+    char* commandLine = GetProcessCommandLine(dwProcessId);
+    if (commandLine == NULL) {
+        CloseHandle(hProcess);
+        return;
+    }
+
+    // Concatenar la línea de comando a la ruta completa del proceso
+    strcat(lpPath, "\n\nCommandLine:\n");
+    strcat(lpPath, commandLine);
+    free(commandLine);
     CloseHandle(hProcess);
-    return dwLength;
 }
 
 void CheckMenuItemProcess(HMENU hMenu, char* ProcessName, DWORD dwProcessId){
@@ -1312,10 +1376,10 @@ void CALLBACK WinEventProc(
 )
 
 {
-    if (dwEvent == EVENT_SYSTEM_FOREGROUND && hwnd != NULL && idObject == OBJID_WINDOW && hwnd != HWNDPrev || dwEvent == EVENT_OBJECT_CREATE && hwnd != NULL && idObject == OBJID_WINDOW && hwnd != HWNDPrev)
+    if (dwEvent == EVENT_OBJECT_CREATE && hwnd != NULL && hwnd != HWNDPrev)
     {
 
-        if (idChild != CHILDID_SELF) {
+        if (idObject != OBJID_WINDOW && idChild != CHILDID_SELF) {
             return;
         }
 
