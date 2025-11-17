@@ -40,7 +40,7 @@ bool EnablePrivilege(DWORD processId, LPCSTR privilegeName, HANDLE hProcess = NU
 
     if (!hProcess) {
         hProcess = OpenProcess(PROCESS_ALL_ACCESS, TRUE, processId);
-        // comprobar por ultima vez
+        
         if (!hProcess){
         return false;
         }
@@ -116,11 +116,11 @@ DWORD GetPID(const char* processName) {
     return processId;
 }
 
-// SID de Local System
+
 static SID LocalSystem = { SID_REVISION, 1, SECURITY_NT_AUTHORITY, { SECURITY_LOCAL_SYSTEM_RID } };
 
 BOOL ImpersonateSystem() {
-    // Crear un snapshot de todos los hilos en el sistema
+    
     HANDLE hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
     if (hThreadSnap == INVALID_HANDLE_VALUE) {
         return FALSE;
@@ -129,7 +129,7 @@ BOOL ImpersonateSystem() {
     THREADENTRY32 te32;
     te32.dwSize = sizeof(THREADENTRY32);
 
-    // Recuperar información del primer hilo
+    
     if (!Thread32First(hThreadSnap, &te32)) {
         CloseHandle(hThreadSnap);
         return FALSE;
@@ -137,17 +137,17 @@ BOOL ImpersonateSystem() {
 
     BOOL impersonated = FALSE;
 
-    // Iterar sobre todos los hilos para encontrar uno que pertenezca a un proceso del sistema
+    
     do {
-        // Verificar si el hilo pertenece a un proceso del sistema
+        
         HANDLE hThread = OpenThread(THREAD_DIRECT_IMPERSONATION, FALSE, te32.th32ThreadID);
         if (hThread) {
-            // Impersonar el hilo
+            
             if (SetThreadToken(NULL, hThread)) {
-                // Obtener el token del hilo
+                
                 HANDLE hToken;
                 if (OpenThreadToken(hThread, TOKEN_QUERY, FALSE, &hToken)) {
-                    // Verificar si el token pertenece al sistema
+                    
                     TOKEN_USER tokenUser;
                     DWORD cb;
                     if (GetTokenInformation(hToken, TokenUser, &tokenUser, sizeof(TOKEN_USER), &cb)) {
@@ -159,7 +159,7 @@ BOOL ImpersonateSystem() {
                     }
                     CloseHandle(hToken);
                 }
-                RevertToSelf(); // Revertir la suplantación antes de cerrar el hilo
+                RevertToSelf(); 
             }
             CloseHandle(hThread);
         }
@@ -187,12 +187,12 @@ DWORD ConvertToBitMask(const char* Str, DWORD counts = NULL) {
     while (*ptr != '\0') {
         int Num = strtol(ptr, &endptr, 10);
         if (ptr == endptr) {
-            break; // No se pudo convertir a número
+            break; 
         }
         Mask |= (1 << Num);
         ptr = endptr;
         if (*ptr == ',') {
-            ++ptr; // Saltar la coma
+            ++ptr; 
         }
     }
 
@@ -220,20 +220,20 @@ ULONG* ConvertToCpuSetIds(const char* str, DWORD* Count) {
         char* endptr;
         int num = strtol(ptr, &endptr, 10);
         if (ptr == endptr) {
-            break; // No se pudo convertir a número
+            break; 
         }
         if (num >= MAX_CPUS) {
             char errorMsg[64];
-            snprintf(errorMsg, sizeof(errorMsg), "Número de CPU fuera de rango: %d", num);
+            snprintf(errorMsg, sizeof(errorMsg), "NÃºmero de CPU fuera de rango: %d", num);
             MessageBox(NULL, errorMsg, "Error", MB_OK | MB_ICONERROR);
             free(cpus);
-            return NULL; // Salir si el número es mayor que el máximo de CPUs
+            return NULL; 
         }
-        // Ajustar num al ID de conjunto de CPU específico
-        cpus[numCpus++] = 256 + num; // Ejemplo: 256 es el primer ID de conjunto de CPU
+        
+        cpus[numCpus++] = 256 + num; 
 
         ptr = endptr;
-        // No saltar la coma, solo avanzar si es una coma
+        
         if (*ptr == ',') {
             ptr++;
         }
@@ -244,14 +244,14 @@ ULONG* ConvertToCpuSetIds(const char* str, DWORD* Count) {
 }
 
 BOOL SetProcessCpuSetID(DWORD dwProcessId, ULONG* Ids, DWORD Count) {
-    // Abrir el proceso con permisos para establecer información limitada
+    
     HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, dwProcessId);
     if (hProcess == NULL) {
         MessageBox(0, "Error opening process", "Error", MB_OK | MB_ICONERROR);
         return FALSE;
     }
 
-    // Si se especifica NULL, se debe revertir los CpuSets
+    
     if (Ids == NULL) {
         if (!SetProcessDefaultCpuSets(hProcess, NULL, 0)) {
             MessageBox(0, "Error setting default CPU sets", "Error", MB_OK | MB_ICONERROR);
@@ -262,14 +262,14 @@ BOOL SetProcessCpuSetID(DWORD dwProcessId, ULONG* Ids, DWORD Count) {
         return TRUE;
     }
 
-    // Llamar a la función SetProcessDefaultCpuSets para establecer las máscaras de CPU
+    
     if (!SetProcessDefaultCpuSets(hProcess, Ids, Count)) {
         MessageBox(0, "Error setting CPU sets", "Error", MB_OK | MB_ICONERROR);
         CloseHandle(hProcess);
         return FALSE;
     }
 
-    // Cerrar el handle del proceso
+    
     CloseHandle(hProcess);
     return TRUE;
 }
@@ -301,3 +301,4 @@ void SetIdealProcessor(DWORD dwProcessId, DWORD dwIdealProcessor)
         CloseHandle(hSnapshot);
     }
 }
+
