@@ -682,7 +682,7 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case WM_CLOSE:
         {
-        // Check Values
+        
         UINT state = IsDlgButtonChecked(hwndDlg, _START);
             if (state == BST_CHECKED)
             {
@@ -698,7 +698,7 @@ BOOL CALLBACK DlgMain(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 RegKeyDelete(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Run", "SetProcess");
                 RegKeyDelete(HKEY_CURRENT_USER, "Software\\SetProcess", "Start");
             }
-            // Exit
+            
             Shell_NotifyIcon(NIM_DELETE, &nid);
             DestroyWindow(hwndDlg);
         }
@@ -712,7 +712,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     hInst=hInstance;
     InitCommonControls();
 
-    // Create WinEventHook
+    
     g_hookID = SetWinEventHook(
         EVENT_SYSTEM_FOREGROUND,
         EVENT_OBJECT_CREATE,
@@ -723,7 +723,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
         WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS | WINEVENT_SKIPOWNTHREAD
     );
 
-    // Load Accelerator
     HWND hwndR = CreateDialog(hInst, MAKEINTRESOURCE(DLG_MAIN), NULL, (DLGPROC)DlgMain);
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0))
@@ -750,4 +749,5 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     }
     return TRUE;
 }
+
 
