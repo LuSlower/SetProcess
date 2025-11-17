@@ -172,15 +172,15 @@ extern "C" {
 void _drain()
 {
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA, false, GetCurrentProcessId());
-    //drenar WorkingSet
+    
     SetProcessWorkingSetSize(hProcess, (SIZE_T) -1, (SIZE_T) -1);
     CloseHandle(hProcess);
 }
 
-//Leer REG_SZ del registro
+
 char* RegKeyQuery(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpValueName)
 {
-    static char result[MAX_PATH]; // Static para que persista fuera del ámbito de la función
+    static char result[MAX_PATH]; 
     HKEY hSubKey;
     if (RegOpenKeyExA(hKey, lpSubKey, 0, KEY_QUERY_VALUE, &hSubKey) == ERROR_SUCCESS)
     {
@@ -193,7 +193,7 @@ char* RegKeyQuery(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpValueName)
         }
         RegCloseKey(hSubKey);
     }
-    return nullptr; // Devolver nullptr si no se pudo leer el valor
+    return nullptr; 
 }
 
 bool RegKeyExists(HKEY hKeyRoot, const char* subKey) {
@@ -205,7 +205,7 @@ bool RegKeyExists(HKEY hKeyRoot, const char* subKey) {
     return false;
 }
 
-//Escribir REG_SZ en el registro
+
 bool RegKeySet(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpValueName, LPCSTR lpData)
 {
     HKEY hSubKey;
@@ -222,7 +222,7 @@ bool RegKeySet(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpValueName, LPCSTR lpData)
     return false;
 }
 
-//Eliminar REG_SZ del registro
+
 bool RegKeyDelete(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpValueName = NULL)
 {
     HKEY hSubKey;
@@ -242,11 +242,11 @@ bool RegKeyDelete(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpValueName = NULL)
     return false;
 }
 
-// SID de Local System
+
 static SID LocalSystem = { SID_REVISION, 1, SECURITY_NT_AUTHORITY, { SECURITY_LOCAL_SYSTEM_RID } };
 
 BOOL ImpersonateSystem() {
-    // Crear un snapshot de todos los hilos en el sistema
+    
     HANDLE hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
     if (hThreadSnap == INVALID_HANDLE_VALUE) {
         return FALSE;
@@ -255,7 +255,7 @@ BOOL ImpersonateSystem() {
     THREADENTRY32 te32;
     te32.dwSize = sizeof(THREADENTRY32);
 
-    // Recuperar información del primer hilo
+    
     if (!Thread32First(hThreadSnap, &te32)) {
         CloseHandle(hThreadSnap);
         return FALSE;
@@ -263,17 +263,17 @@ BOOL ImpersonateSystem() {
 
     BOOL impersonated = FALSE;
 
-    // Iterar sobre todos los hilos para encontrar uno que pertenezca a un proceso del sistema
+    
     do {
-        // Verificar si el hilo pertenece a un proceso del sistema
+        
         HANDLE hThread = OpenThread(THREAD_DIRECT_IMPERSONATION, FALSE, te32.th32ThreadID);
         if (hThread) {
-            // Impersonar el hilo
+            
             if (SetThreadToken(NULL, hThread)) {
-                // Obtener el token del hilo
+                
                 HANDLE hToken;
                 if (OpenThreadToken(hThread, TOKEN_QUERY, FALSE, &hToken)) {
-                    // Verificar si el token pertenece al sistema
+                    
                     TOKEN_USER tokenUser;
                     DWORD cb;
                     if (GetTokenInformation(hToken, TokenUser, &tokenUser, sizeof(TOKEN_USER), &cb)) {
@@ -285,7 +285,7 @@ BOOL ImpersonateSystem() {
                     }
                     CloseHandle(hToken);
                 }
-                RevertToSelf(); // Revertir la suplantación antes de cerrar el hilo
+                RevertToSelf(); 
             }
             CloseHandle(hThread);
         }
@@ -307,7 +307,7 @@ bool EnablePrivilege(DWORD processId, LPCSTR privilegeName, HANDLE hProcess = NU
 
     if (!hProcess) {
         hProcess = OpenProcess(PROCESS_ALL_ACCESS, TRUE, processId);
-        // comprobar por ultima vez
+        
         if (!hProcess){
         return false;
         }
@@ -385,13 +385,13 @@ DWORD GetPID(const char* processName) {
 
 DWORD ExtractPID(const char* str) {
     DWORD pid = 0;
-    char buffer[256]; // Buffer para manipular la cadena
-    snprintf(buffer, sizeof(buffer), "%s", str); // Copiar la cadena original a buffer
+    char buffer[256]; 
+    snprintf(buffer, sizeof(buffer), "%s", str); 
 
-    char* start = strstr(buffer, "(PID:"); // Buscar la cadena "(PID: "
+    char* start = strstr(buffer, "(PID:"); 
     if (start) {
-        start += strlen("(PID:"); // Moverse al inicio del número de PID
-        pid = strtoul(start, NULL, 10); // Convertir el número a DWORD
+        start += strlen("(PID:"); 
+        pid = strtoul(start, NULL, 10); 
     }
     return pid;
 
@@ -402,8 +402,8 @@ void ExtractProcessName(const char* str, char* processName, size_t bufferSize) {
         return;
     }
 
-    const char* start = str; // El inicio del nombre del proceso
-    const char* end = strstr(str, " (PID:"); // Buscar el inicio del PID
+    const char* start = str; 
+    const char* end = strstr(str, " (PID:"); 
 
     if (end && end > start) {
         size_t length = end - start;
@@ -415,26 +415,26 @@ void ExtractProcessName(const char* str, char* processName, size_t bufferSize) {
             processName[bufferSize - 1] = '\0';
         }
     } else {
-        // No se encontró el nombre del proceso en el formato esperado
+        
         processName[0] = '\0';
     }
 }
 
 void CreateToolTip(HWND hwndParent, HWND hwndControl, LPSTR text)
 {
-    // Inicializar el tooltip
+    
     hwndToolTip = CreateWindowEx(WS_EX_TOPMOST, TOOLTIPS_CLASS, NULL,
         WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX,
         CW_USEDEFAULT, CW_USEDEFAULT,
         CW_USEDEFAULT, CW_USEDEFAULT,
         hwndParent, NULL, NULL, NULL);
 
-    // Configurar el estilo para un tooltip con fondo oscuro
+    
     SendMessage(hwndToolTip, TTM_SETTIPBKCOLOR, RGB(30, 30, 30), 0);
     SendMessage(hwndToolTip, TTM_SETTIPTEXTCOLOR, RGB(255, 255, 255), 0);
-    SendMessage(hwndToolTip, TTM_SETMAXTIPWIDTH, 0, 300); // Ancho máximo del tooltip
+    SendMessage(hwndToolTip, TTM_SETMAXTIPWIDTH, 0, 300); 
 
-    // Asociar el tooltip con el control
+    
     TOOLINFO toolInfo = { 0 };
     toolInfo.cbSize = sizeof(TOOLINFO);
     toolInfo.hwnd = hwndParent;
@@ -442,7 +442,7 @@ void CreateToolTip(HWND hwndParent, HWND hwndControl, LPSTR text)
     toolInfo.uId = (UINT_PTR)hwndControl;
     toolInfo.lpszText = (LPSTR)text;
 
-    // Agregar la herramienta al tooltip
+    
     SendMessage(hwndToolTip, TTM_ADDTOOL, 0, (LPARAM)&toolInfo);
 }
 
@@ -450,7 +450,7 @@ void UpdateToolTipText(HWND hwndControl, LPSTR text)
 {
     TOOLINFO toolInfo = { 0 };
     toolInfo.cbSize = sizeof(TOOLINFO);
-    toolInfo.hwnd = GetParent(hwndControl); // Obtener el HWND del control padre
+    toolInfo.hwnd = GetParent(hwndControl); 
     toolInfo.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
     toolInfo.uId = (UINT_PTR)hwndControl;
     toolInfo.lpszText = text;
@@ -468,7 +468,7 @@ BOOL GetProcessCpuSetId(DWORD dwProcessId, ULONG* cpuSetIds, ULONG* cpuSetIdCoun
 
     ULONG requiredIdCount = 0;
 
-    // Obtener los IDs de los conjuntos de CPU predeterminados del proceso
+    
     BOOL success = GetProcessDefaultCpuSets(hProcess, cpuSetIds, *cpuSetIdCount, &requiredIdCount);
 
     CloseHandle(hProcess);
@@ -479,13 +479,13 @@ BOOL GetProcessCpuSetId(DWORD dwProcessId, ULONG* cpuSetIds, ULONG* cpuSetIdCoun
         return FALSE;
     }
 
-    // Verificar si no se encontraron conjuntos de CPU asignados
+    
     if (requiredIdCount == 0)
     {
         return FALSE;
     }
 
-    *cpuSetIdCount = requiredIdCount; // Actualizar el contador de IDs recibidos
+    *cpuSetIdCount = requiredIdCount; 
 
     return TRUE;
 }
@@ -522,7 +522,7 @@ DWORD_PTR GetProcessAffinity(DWORD dwProcessId) {
     DWORD_PTR dwProcessAffinityMask = 0;
     DWORD_PTR dwSystemAffinityMask = 0;
 
-    // Obtener la máscara de afinidad de procesador del sistema
+    
     if (!GetProcessAffinityMask(hProcess, &dwProcessAffinityMask, &dwSystemAffinityMask)) {
         MessageBox(0, "Error getting process affinity mask", "Error", MB_OK | MB_ICONERROR);
         CloseHandle(hProcess);
@@ -539,20 +539,20 @@ void SetProcessAffinity(DWORD dwProcessId, DWORD_PTR dwProcessAffinityMask) {
         return;
     }
 
-    // Aplicar la máscara de afinidad de procesador al proceso
+    
     SetProcessAffinityMask(hProcess, dwProcessAffinityMask);
     CloseHandle(hProcess);
 }
 
 int GetSingleCoreIndex(DWORD* CPUs, DWORD MAX_CPUS)
 {
-    int activeIndex = -1; // Inicializar con valor inválido
+    int activeIndex = -1; 
 
     for (DWORD i = 0; i < MAX_CPUS; ++i)
     {
         if (CPUs[i] == 1)
         {
-            // Si ya encontramos un bit activo previamente, no hay exactamente uno
+            
             if (activeIndex != -1)
                 return -1;
 
@@ -560,7 +560,7 @@ int GetSingleCoreIndex(DWORD* CPUs, DWORD MAX_CPUS)
         }
     }
 
-    return activeIndex; // Retornar el índice del bit activo o -1 si no se encontró exactamente uno
+    return activeIndex; 
 }
 
 BOOL GetIdealProcessor(DWORD dwProcessId, PPROCESSOR_NUMBER lpIdealProcessor)
@@ -695,7 +695,7 @@ void SetProcessPriority(DWORD dwProcessId, DWORD dwPriorityClass)
             break;
     }
 
-    // Establecer prioridad
+    
     SetPriorityClass(hProcess, dwPriorityClass);
     CloseHandle(hProcess);
 
@@ -756,7 +756,7 @@ void SetPriority(const char* PriorityType, DWORD dwProcessId, ULONG Priority){
 
     if (strcmp(PriorityType, "MEM") == 0) {
 
-        // Establecer prioridad de memoria
+        
         MEMORY_PRIORITY_INFORMATION MemPrio;
         SecureZeroMemory(&MemPrio, sizeof(MemPrio));
         MemPrio.MemoryPriority = Priority;
@@ -764,7 +764,7 @@ void SetPriority(const char* PriorityType, DWORD dwProcessId, ULONG Priority){
 
     } else if (strcmp(PriorityType, "IO") == 0) {
 
-        // Establecer prioridad E/S
+        
         IO_PRIORITY_INFORMATION IoPrio;
         SecureZeroMemory(&IoPrio, sizeof(IoPrio));
         IoPrio.IoPriority = Priority;
@@ -781,7 +781,7 @@ bool GetPriority(const char* PriorityType, DWORD dwProcessId, ULONG& Priority) {
     }
 
     if (strcmp(PriorityType, "MEM") == 0) {
-        // Obtener prioridad de memoria
+        
         MEMORY_PRIORITY_INFORMATION MemPrio;
         SecureZeroMemory(&MemPrio, sizeof(MemPrio));
 
@@ -793,7 +793,7 @@ bool GetPriority(const char* PriorityType, DWORD dwProcessId, ULONG& Priority) {
             return false;
         }
     } else if (strcmp(PriorityType, "IO") == 0) {
-        // Obtener prioridad E/S
+        
         IO_PRIORITY_INFORMATION IoPrio;
         SecureZeroMemory(&IoPrio, sizeof(IoPrio));
 
@@ -820,11 +820,11 @@ void SetProcessQos(const char* QosType, DWORD dwProcessId)
     PowerThrottling.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
 
     if (strcmp(QosType, "ECO") == 0) {
-        // Establecer estado de eficiencia (EcoQos)
+        
         PowerThrottling.StateMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
         SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
     } else if (strcmp(QosType, "HIGH") == 0) {
-        // Establecer estado de maximo rendimiento (HighQos)
+        
         PowerThrottling.StateMask = 0x0;
         SetProcessInformation(hProcess, ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
     }
@@ -854,7 +854,7 @@ BOOL IsSuspended(DWORD dwProcessId) {
     NTSTATUS status = ZwQuerySystemInformation(SystemProcessInformation, NULL, 0, &bufferSize);
     if (status != STATUS_INFO_LENGTH_MISMATCH) {
         MessageBox(0, "Error obtaining initial buffer size", "Error", MB_OK | MB_ICONERROR);
-        return FALSE;  // Error al obtener tamaño inicial
+        return FALSE;  
     }
 
     PVOID buffer = NULL;
@@ -862,7 +862,7 @@ BOOL IsSuspended(DWORD dwProcessId) {
         buffer = malloc(bufferSize);
         if (!buffer) {
             MessageBox(0, "Error allocating memory", "Error", MB_OK | MB_ICONERROR);
-            return FALSE;  // Error al asignar memoria
+            return FALSE;  
         }
 
         status = ZwQuerySystemInformation(SystemProcessInformation, buffer, bufferSize, NULL);
@@ -875,7 +875,7 @@ BOOL IsSuspended(DWORD dwProcessId) {
     if (!NT_SUCCESS(status)) {
         MessageBox(0, "Error obtaining process information", "Error", MB_OK | MB_ICONERROR);
         free(buffer);
-        return FALSE;  // Error al obtener información de procesos
+        return FALSE;  
     }
 
     BOOL anyThreadSuspended = FALSE;
@@ -977,9 +977,9 @@ char* GetProcessCommandLine(DWORD dwProcessId) {
         return NULL;
     }
 
-    commandLineBuffer[commandLineUnicode.Length / sizeof(WCHAR)] = L'\0'; // Asegurarse de que está terminada en null
+    commandLineBuffer[commandLineUnicode.Length / sizeof(WCHAR)] = L'\0'; 
 
-    // Convertir UNICODE_STRING a char*
+    
     int bufferSize = WideCharToMultiByte(CP_UTF8, 0, commandLineBuffer, -1, NULL, 0, NULL, NULL);
     char* commandLine = (char*)malloc(bufferSize);
     if (!commandLine) {
@@ -1012,7 +1012,7 @@ void GetProcInfo(DWORD dwProcessId, LPSTR lpPath, DWORD nSize) {
         return;
     }
 
-    // Concatenar la línea de comando a la ruta completa del proceso
+    
     strcat(lpPath, "\n\nCommandLine:\n");
     strcat(lpPath, commandLine);
     free(commandLine);
@@ -1021,14 +1021,14 @@ void GetProcInfo(DWORD dwProcessId, LPSTR lpPath, DWORD nSize) {
 
 void CheckMenuItemProcess(HMENU hMenu, char* ProcessName, DWORD dwProcessId){
 
-    // Construir la clave del registro
+    
     char registryKey[MAX_PATH];
     snprintf(registryKey, sizeof(registryKey), "Software\\SetProcess\\%s", ProcessName);
 
     EnablePrivilege(dwProcessId, SE_INC_BASE_PRIORITY_NAME);
     EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
 
-    // Marcar el ítem de menú correspondiente según la prioridad de CPU
+    
     DWORD dwPriorityClass = GetProcessPriority(dwProcessId);
     UINT priorityClassId;
 
@@ -1076,7 +1076,7 @@ void CheckMenuItemProcess(HMENU hMenu, char* ProcessName, DWORD dwProcessId){
         CheckMenuItem(hMenu, IDM_CPU_PRIORITY_SAVE, MF_BYCOMMAND | MF_CHECKED);
     }
 
-    // Marcar el ítem de menú correspondiente según la prioridad de memoria
+    
     ULONG memPriority;
     GetPriority("MEM", dwProcessId, memPriority);
     UINT memPriorityId;
@@ -1118,7 +1118,7 @@ void CheckMenuItemProcess(HMENU hMenu, char* ProcessName, DWORD dwProcessId){
         CheckMenuItem(hMenu, IDM_MEMORY_PRIORITY_SAVE, MF_BYCOMMAND | MF_CHECKED);
     }
 
-    // Marcar el ítem de menú correspondiente según la prioridad de memoria
+    
     ULONG ioPriority;
     GetPriority("IO", dwProcessId, ioPriority);
     UINT ioPriorityId;
@@ -1155,7 +1155,7 @@ void CheckMenuItemProcess(HMENU hMenu, char* ProcessName, DWORD dwProcessId){
         CheckMenuItem(hMenu, IDM_IO_PRIORITY_SAVE, MF_BYCOMMAND | MF_CHECKED);
     }
 
-    // Verificar PriorityBoost
+    
     if (IsBoost(dwProcessId)) {
         CheckMenuItem(hMenu, IDM_CPU_PRIORITY_BOOST, MF_BYCOMMAND | MF_CHECKED);
     }
@@ -1164,7 +1164,7 @@ void CheckMenuItemProcess(HMENU hMenu, char* ProcessName, DWORD dwProcessId){
         CheckMenuItem(hMenu, IDM_CPU_PRIORITY_BOOST_SAVE, MF_BYCOMMAND | MF_CHECKED);
     }
 
-    //Verificar Qos
+    
     ULONG Qos;
     GetProcessQos(dwProcessId, Qos);
 
@@ -1210,35 +1210,35 @@ void LoadConfigProcess(const char* ProcessName, DWORD dwProcessId)
         DWORD cpuSetBitMask[MAX_CPUS] = {0};
         size_t maskLength = strlen(cpuSetMask);
 
-        // Asegurar que la longitud de la máscara no exceda el número máximo de CPUs
+        
         if (maskLength > MAX_CPUS) {
             maskLength = MAX_CPUS;
         }
 
-        // Convertir la cadena de bits a una bitmask
+        
         for (size_t i = 0; i < maskLength; ++i) {
             if (cpuSetMask[i] == '1') {
-                cpuSetBitMask[i] = 1;  // Establecer el bit correspondiente en la bitmask
+                cpuSetBitMask[i] = 1;  
             } else {
-                cpuSetBitMask[i] = 0;  // Asegurar que el resto se inicialice a 0
+                cpuSetBitMask[i] = 0;  
             }
         }
 
         ULONG cpuSetIds[MAX_CPUS] = {0};
         ULONG idIndex = 0;
 
-        // Convertir la bitmask a IDs de conjuntos de CPU
+        
         for (ULONG i = 0; i < MAX_CPUS; ++i) {
             if (cpuSetBitMask[i] == 1) {
-                cpuSetIds[idIndex++] = i + 256; // Ajustar el valor según tu implementación
+                cpuSetIds[idIndex++] = i + 256; 
             }
         }
 
-        // Establecer los conjuntos de CPU para el proceso
+        
         SetProcessCpuSetId(dwProcessId, cpuSetIds, idIndex);
     }
 
-    // Cargar IdealProcessor
+    
     char* IdealProcStr = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "IdealProc");
     if (IdealProcStr != nullptr)
     {
@@ -1246,7 +1246,7 @@ void LoadConfigProcess(const char* ProcessName, DWORD dwProcessId)
         SetIdealProcessor(dwProcessId, IdealProc);
     }
 
-    // Cargar AffinityMask
+    
     char* affinityMask = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "AffinityMask");
 
     if (affinityMask != nullptr)
@@ -1260,7 +1260,7 @@ void LoadConfigProcess(const char* ProcessName, DWORD dwProcessId)
         SetProcessAffinity(dwProcessId, dwProcessAffinityMask);
     }
 
-    // Cargar PriorityBoost
+    
     char* priorityBoost = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityBoost");
     if (priorityBoost != nullptr) {
         if (strcmp(priorityBoost, "0") == 0) {
@@ -1270,32 +1270,32 @@ void LoadConfigProcess(const char* ProcessName, DWORD dwProcessId)
         }
     }
 
-    // Cargar PriorityClass
+    
     char* Priority = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "PriorityClass");
     if (Priority != nullptr) {
         EnablePrivilege(dwProcessId, SE_DEBUG_NAME);
         SetProcessPriority(dwProcessId, atoi(Priority));
     }
 
-    // Cargar MemPriority
+    
     char* memPriority = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "MemoryPriority");
     if (memPriority != nullptr) {
         SetPriority("MEM", dwProcessId, atoi(memPriority));
     }
 
-    // Cargar IoPriority
+    
     char* ioPriority = RegKeyQuery(HKEY_CURRENT_USER, registryKey, "IoPriority");
     if (ioPriority != nullptr) {
         SetPriority("IO", dwProcessId, atoi(ioPriority));
     }
 
-    // Cargar EcoQos
+    
     if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "EcoQos") != nullptr) {
         SetProcessPriority(dwProcessId, 0);
         SetProcessQos("ECO", dwProcessId);
     }
 
-    // Cargar HighQos
+    
     if (RegKeyQuery(HKEY_CURRENT_USER, registryKey, "HighQos") != nullptr) {
         SetProcessQos("HIGH", dwProcessId);
     }
@@ -1320,10 +1320,10 @@ void PopulateListBox(HWND hListBox) {
 
     if (Process32First(hSnapshot, &pe32)) {
         do {
-            // Añadir procesos al ListBox
+            
             AddProcessToListBox(hListBox, pe32.szExeFile, pe32.th32ProcessID);
 
-            // Leer la configuración del registro para este proceso
+            
             LoadConfigProcess(pe32.szExeFile, pe32.th32ProcessID);
         } while (Process32Next(hSnapshot, &pe32));
     }
@@ -1343,21 +1343,21 @@ void ShowListBoxMenu(HWND hListBox, char* ProcessName, DWORD dwProcessId, int x,
     }
 }
 
-// Declaración del trayicon
+
 NOTIFYICONDATA nid;
 bool isIconVisible = false;
 
-//ShowTrayMenu
+
 void ShowTrayMenu(HWND hWnd)
 {
-    //obtener posición del puntero (x,y)
+    
     POINT pt;
     GetCursorPos(&pt);
 
     HMENU hMenu = CreatePopupMenu();
     AppendMenu(hMenu, MF_STRING, IDM_EXIT, "Exit");
 
-    //poner en primer plano la ventana actual y centrar el menú
+    
     SetForegroundWindow(hWnd);
     TrackPopupMenu(hMenu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_NONOTIFY | TPM_LEFTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
     DestroyMenu(hMenu);
@@ -1386,7 +1386,7 @@ void CALLBACK WinEventProc(
         DWORD dwProcessId = 0;
         GetWindowThreadProcessId(hwnd, &dwProcessId);
 
-        // Obtener el nombre del proceso asociado con el ID del proceso
+        
         HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, dwProcessId);
         if (hProcess)
         {
@@ -1411,21 +1411,21 @@ void CALLBACK WinEventProc(
 INT_PTR CALLBACK BitMaskDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     static DWORD* pCPUs = nullptr;
-    static DWORD MAX_CPUS = 0; // Tamaño máximo de CPUs, ajustar según tu necesidad
+    static DWORD MAX_CPUS = 0; 
 
     switch (message)
     {
         case WM_INITDIALOG:
         {
 
-            //establecer hIcon
+            
             HICON hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON));
             SendMessage(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
 
-            // Destruir icono
+            
             DestroyIcon(hIcon);
 
-            // Asignar pCPUs desde lParam
+            
             pCPUs = reinterpret_cast<DWORD*>(lParam);
 
             if (!pCPUs)
@@ -1455,7 +1455,7 @@ INT_PTR CALLBACK BitMaskDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
             {
                 case IDC_SAVE_BITMASK:
                 {
-                    // Leer el estado de los checkboxes y guardar en pCPUs
+                    
                     for (DWORD i = 0; i < MAX_CPUS; ++i)
                     {
                         pCPUs[i] = IsDlgButtonChecked(hDlg, IDC_CPU_0 + i) == BST_CHECKED ? 1 : 0;
@@ -1467,7 +1467,7 @@ INT_PTR CALLBACK BitMaskDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 
                 case IDC_CHECK_ALL:
                 {
-                    // Marcar todos los checkboxes
+                    
                     for (DWORD i = 0; i < MAX_CPUS; ++i)
                     {
                         CheckDlgButton(hDlg, IDC_CPU_0 + i, BST_CHECKED);
@@ -1478,7 +1478,7 @@ INT_PTR CALLBACK BitMaskDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 
                 case IDC_UNCHECK:
                 {
-                    // Desmarcar todos los checkboxes
+                    
                     for (DWORD i = 0; i < MAX_CPUS; ++i)
                     {
                         CheckDlgButton(hDlg, IDC_CPU_0 + i, BST_UNCHECKED);
@@ -1490,7 +1490,7 @@ INT_PTR CALLBACK BitMaskDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
             break;
         case WM_CLOSE:
             {
-                // Desmarcar todos los checkboxes
+                
                 for (DWORD i = 0; i < MAX_CPUS; ++i)
                 {
                     CheckDlgButton(hDlg, IDC_CPU_0 + i, BST_UNCHECKED);
@@ -1506,4 +1506,5 @@ void ShowBitMaskDialog(HWND hParent, DWORD* CPUs)
 {
     DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(DLG_BITMASK), hParent, BitMaskDlgProc, reinterpret_cast<LPARAM>(CPUs));
 }
+
 
